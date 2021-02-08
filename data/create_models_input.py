@@ -41,6 +41,10 @@ alpha_global = 0.8
 global_prefix = 'raisha'
 global_suffix = 'saifa'
 crf_label_col_name = 'labels'
+prefix_history_col_name = 'history'
+prefix_future_col_name = 'future'
+prefix_suffix_col_name = 'suffix'
+curr_round_col_name = 'curr_round_feature'
 
 
 def rename_review_features_column(review_data: pd.DataFrame, prefix_column_name: str):
@@ -60,16 +64,11 @@ def rename_review_features_column(review_data: pd.DataFrame, prefix_column_name:
     return review_data
 
 
-def create_average_history_text(rounds: list, temp_reviews: pd.DataFrame, prefix_history_col_name: str='history',
-                                prefix_future_col_name: str = 'future', prefix_suffix_col_name: str='suffix'):
-    """
-    This function get the temp reviews with the review_id, round_number and the features for the reviews as column for
+def create_average_history_text(rounds: list, temp_reviews: pd.DataFrame):
+    """This function get the temp reviews with the review_id, round_number and the features for the reviews as column for
     each feature
     :param rounds: list of the rounds to create history average features for
     :param temp_reviews: pdDataFrame with review_id, round_number, features as columns
-    :param prefix_history_col_name: the prefix of the history column names
-    :param prefix_future_col_name: the prefix of the future column names
-    :param prefix_suffix_col_name: the prefix of the suffix column names
     :return:
     """
     history_reviews = pd.DataFrame()
@@ -303,9 +302,9 @@ class CreateSaveData:
                 if features_to_drop is not None:
                     reviews_features_files_list[index] = reviews_features_file.drop(features_to_drop, axis=1)
 
-        if len(reviews_features_files_list) == 1:
+        if len(reviews_features_files_list) == 1:  # hand crafted features
             self.reviews_features = reviews_features_files_list[0]
-        elif len(reviews_features_files_list) == 2:
+        elif len(reviews_features_files_list) == 2:  # BERT features
             self.reviews_features = reviews_features_files_list[0].merge(reviews_features_files_list[1],
                                                                          on='review_id')
         else:
@@ -428,22 +427,19 @@ class CreateSaveData:
 
         return
 
-    def set_text_average(self, rounds, reviews_features, data, prefix_history_col_name: str='history',
-                         prefix_future_col_name: str='future'):
+    def set_text_average(self, rounds, reviews_features, data):
         """
         Create data frame with the history and future average text features and the current round text features
         :param rounds: the rounds to use
         :param reviews_features: the reviews features of this pair
         :param data: the data we want to merge to
-        :param prefix_history_col_name: the prefix of the history column names
-        :param prefix_future_col_name: the prefix of the future column names
         :return:
         """
         history_reviews, future_reviews, suffix_reviews =\
-            create_average_history_text(rounds, reviews_features, prefix_history_col_name, prefix_future_col_name)
+            create_average_history_text(rounds, reviews_features)
         # add the current round reviews features
         reviews_features = reviews_features.drop('subsession_round_number', axis=1)
-        reviews_features = rename_review_features_column(reviews_features, 'curr_round_feature')
+        reviews_features = rename_review_features_column(reviews_features, curr_round_col_name)
         if not self.suffix_no_current_round_average_text:
             data = data.merge(reviews_features, on='review_id', how='left')
         data = data.merge(history_reviews, on='review_id', how='left')
@@ -470,17 +466,16 @@ class CreateSaveData:
 
         meta_data_columns = ['subsession_round_number', 'pair_id', 'sample_id']
         history_features_columns = self.history_columns
+        rounds = list(range(1, 11))
 
-        columns_to_use = ['review_id']
+        columns_to_use = ['review_id', 'group_sender_answer_reviews', 'subsession_round_number']
 
         if self.use_all_history_average:
             columns_to_use = columns_to_use + history_features_columns
 
-        columns_to_use = columns_to_use + ['subsession_round_number']
-
         for pair in self.pairs:
             data = self.data.loc[self.data.pair_id == pair][columns_to_use]
-            rounds = list(range(1, 11))
+
             # concat history numbers
             if self.use_all_history:
                 temp_numbers = self.data.loc[self.data.pair_id == pair][self.decisions_payoffs_columns +
@@ -506,7 +501,7 @@ class CreateSaveData:
                 data = data.merge(history_reviews, on='review_id', how='left')
             if self.no_suffix_text and not self.suffix_average_text:
                 # remove curr_round_features because we have all suffix features
-                curr_round_features_columns = [column for column in data.columns if 'curr_round_feature' in column]
+                curr_round_features_columns = [column for column in data.columns if curr_round_col_name in column]
                 data = data.drop(curr_round_features_columns, axis=1)
 
             if not self.use_all_history_text and not self.use_all_history_text_average:  # no history text
@@ -517,8 +512,6 @@ class CreateSaveData:
             data = data.drop('review_id', axis=1)
 
             # add metadata
-            # prefix
-            data[meta_data_columns[0]] = data['subsession_round_number'] - 1
             self.data['sample_id'] = self.data[meta_data_columns[1]] + '_' + (
                         self.data['subsession_round_number'] - 1).map(str)
             # add sample ID column
@@ -545,8 +538,6 @@ class CreateSaveData:
             # concat to all data
             self.final_data = pd.concat([self.final_data, data], axis=0, ignore_index=True)
 
-        if 'subsession_round_number' in self.final_data.columns:
-            self.final_data = self.final_data.drop('subsession_round_number', axis=1)
         # sort columns according to the round number
         if self.use_all_history_text or self.use_all_history:
             columns_to_sort = self.reviews_features.columns.values.tolist() + self.decisions_payoffs_columns
@@ -567,14 +558,28 @@ class CreateSaveData:
             columns_order.extend(meta_data_columns)
             self.final_data = self.final_data[columns_order]
 
-        # save column names to get the features later
-        file_name = f'features_{self.base_file_name}'
-        features_columns = self.final_data.columns.tolist()
-        columns_to_drop = meta_data_columns + ['subsession_round_number', self.label]
-        for column in columns_to_drop:
-            if column in features_columns:
-                features_columns.remove(column)
-        pd.DataFrame(features_columns).to_excel(os.path.join(save_data_directory, f'{file_name}.xlsx'), index=True)
+        # create multi level columns to make it easier to use the df later
+        history_features = [column for column in self.final_data.columns if prefix_history_col_name in column]
+        current_round_text_features = [column for column in self.final_data.columns if curr_round_col_name in column]
+        final_data_columns = meta_data_columns + history_features + current_round_text_features +\
+                             ['group_sender_answer_reviews', self.label]
+        self.final_data = self.final_data[final_data_columns]
+        # create tuples for multi level columns
+        multi_level_column_names = list()
+        multi_level_column_names.extend([('meta_data', column) for column in meta_data_columns])
+        multi_level_column_names.extend([('history_features', column) for column in history_features])
+        multi_level_column_names.extend([('current_text_features', column) for column in current_round_text_features])
+        multi_level_column_names.append(('plain_text', 'group_sender_answer_reviews'))
+        multi_level_column_names.append(('label', self.label))
+        self.final_data.columns = pd.MultiIndex.from_tuples(multi_level_column_names, names=('high', 'low'))
+        # # save column names to get the features later
+        # file_name = f'features_{self.base_file_name}'
+        # features_columns = self.final_data.columns.tolist()
+        # columns_to_drop = meta_data_columns + ['subsession_round_number', self.label]
+        # for column in columns_to_drop:
+        #     if column in features_columns:
+        #         features_columns.remove(column)
+        # pd.DataFrame(features_columns).to_excel(os.path.join(save_data_directory, f'{file_name}.xlsx'), index=True)
 
         # save final data
         file_name = f'all_data_{self.base_file_name}'
@@ -585,143 +590,6 @@ class CreateSaveData:
         logging.info('Finish creating manual features data')
 
         return
-
-    def create_features_for_prefix_suffix_models(self, string_labels=False):
-        """
-        This function create 10 samples with different prefix length from each pair data raw for our DNN models.
-        Each round is represents as the features of the round.
-        For prefix rounds: text + decisions and feedback, for suffix rounds: only text
-        :return:
-        """
-
-        print(f'Start create_manual_features_crf_prefix_data_in_seq_not_as_features')
-        logging.info('Start create_manual_features_crf_prefix_data_in_seq_not_as_features')
-
-        # only for single_round label
-        if self.label != 'single_round':
-            print('CRF prefix function works only with single_round label!')
-            return
-
-        text_columns = copy.deepcopy(self.reviews_features.columns.to_list())
-        text_columns.remove('review_id')
-        decisions_payoffs_columns = self.decisions_payoffs_columns
-        if self.non_nn_turn_model and 'exp_payoff' in decisions_payoffs_columns:
-            decisions_payoffs_columns.remove('exp_payoff')
-
-        # labels columns:
-        label_column = ['round_label']
-
-        all_column = decisions_payoffs_columns + text_columns + label_column
-
-        # merge the round number features with the review features
-        data_for_pairs = self.data.merge(self.reviews_features, on='review_id', how='left')
-
-        file_name = f'features_{self.base_file_name}'
-        pd.DataFrame(all_column).to_excel(os.path.join(save_data_directory, f'{file_name}.xlsx'), index=True)
-
-        data_for_pairs['round_label'] = np.where(data_for_pairs.exp_payoff == 1, 1, -1)
-        data_for_pairs = data_for_pairs[all_column + ['pair_id', 'subsession_round_number']]
-        for pair in self.pairs:
-            print(f'{time.asctime(time.localtime(time.time()))}: Start create data for pair {pair}')
-            data_pair_label = data_for_pairs.loc[data_for_pairs.pair_id == pair].copy(deep=True)
-            label_pair = data_pair_label[label_column + ['subsession_round_number']].copy(deep=True)
-            prefix_data_dict = defaultdict(dict)
-
-            for prefix in range(0, 10):
-                # add metadata and labels
-                prefix_data_dict[prefix][global_prefix] = prefix
-                prefix_data_dict[prefix]['pair_id'] = pair
-                prefix_data_dict[prefix]['sample_id'] = f'{pair}_{prefix}'
-
-                if string_labels:
-                    prefix_data_dict[prefix][crf_label_col_name] =\
-                        np.where(label_pair.loc[label_pair.subsession_round_number.isin(list(range(prefix+1, 11)))].
-                                 round_label.values == 1,'hotel', 'stay_home').tolist()
-
-                else:
-                    # for int labels
-                    prefix_data_dict[prefix][crf_label_col_name] =\
-                        label_pair.loc[label_pair.subsession_round_number.isin(list(range(prefix + 1, 11)))].\
-                            round_label.astype(int).values.tolist()
-
-                for round_num in range(1, 11):
-                    # the prefix data --> put text and decisions (prefix: 0, 1,...9, rounds: 1, 2,...,10
-                    if round_num <= prefix:
-                        round_columns = text_columns + decisions_payoffs_columns
-                    # the suffix data --> only text
-                    else:
-                        round_columns = text_columns
-
-                    round_data = data_pair_label.loc[data_for_pairs.subsession_round_number == round_num].copy(deep=True)
-                    round_data = round_data[round_columns]
-                    round_data = round_data.values.tolist()[0]
-                    prefix_data_dict[prefix][f'features_round_{round_num}'] = round_data
-
-            pair_prefix_data = pd.DataFrame.from_dict(prefix_data_dict).T
-            self.final_data = pd.concat([self.final_data, pair_prefix_data], axis=0, ignore_index=True)
-
-        file_name = f'all_data_{self.base_file_name}'
-        # save_data = self.final_data.drop(['pair_id'], axis=1)
-        if not self.non_nn_turn_model:
-            print(f'{time.asctime(time.localtime(time.time()))}: Save all data {file_name}.pkl')
-            save_data = self.final_data
-            save_data.to_csv(os.path.join(save_data_directory, f'{file_name}.csv'), index=False)
-            joblib.dump(save_data, os.path.join(save_data_directory, f'{file_name}.pkl'))
-
-        print(f'{time.asctime(time.localtime(time.time()))}: '
-              f'Finish creating sequences with different lengths and concat with manual features for the text')
-        logging.info(f'{time.asctime(time.localtime(time.time()))}: '
-                     f'Finish creating sequences with different lengths and concat features for the text')
-
-        print(f'max features num is: '
-              f'{max([max(pair_prefix_data[f"features_round_{i}"].str.len()) for i in range(1, 11)])}')
-
-        return
-
-    def create_non_nn_turn_model_features(self):
-        """
-        This function flat the prefix-suffix data to match it to the non nn TR model features (MVC, EWG)
-        :return:
-        """
-
-        print(f'{time.asctime(time.localtime(time.time()))}: Start create_non_nn_turn_model_features')
-        logging.info(f'{time.asctime(time.localtime(time.time()))}: Start create_non_nn_turn_model_features')
-
-        data_to_flat = self.final_data.copy(deep=True)
-        all_flat_data = defaultdict(dict)
-        for index, row in data_to_flat.iterrows():
-            labels = row[crf_label_col_name]
-            prefix = row[global_prefix]
-            for label_index, round_number in enumerate(range(prefix+1, 11)):
-                # features columns are features_round_1,..., features_round_10
-                all_flat_data[f'{index}_{label_index}']['features'] = row[f'features_round_{round_number}']
-                all_flat_data[f'{index}_{label_index}'][crf_label_col_name] = labels[label_index]
-                all_flat_data[f'{index}_{label_index}'][global_prefix] = prefix
-                all_flat_data[f'{index}_{label_index}']['round_number'] = round_number
-                all_flat_data[f'{index}_{label_index}']['pair_id'] = row.pair_id
-                all_flat_data[f'{index}_{label_index}']['sample_id'] = row['sample_id'] + '_' + str(round_number)
-
-        all_flat_data_df = pd.DataFrame.from_dict(all_flat_data).T.astype({
-            'features': object, crf_label_col_name: int, global_prefix: int, 'round_number': int, 'pair_id': object,
-            'sample_id': object})
-        self.final_data = all_flat_data_df
-
-        file_name = f'all_data_{self.base_file_name}'
-        print(f'{time.asctime(time.localtime(time.time()))}: Save all data {file_name}.pkl')
-        # save_data = self.final_data.drop(['pair_id'], axis=1)
-        save_data = self.final_data
-        save_data.to_csv(os.path.join(save_data_directory, f'{file_name}.csv'), index=False)
-        joblib.dump(save_data, os.path.join(save_data_directory, f'{file_name}.pkl'))
-
-        text_columns = copy.deepcopy(self.reviews_features.columns.to_list())
-        text_columns.remove('review_id')
-        if len(text_columns) != len(row[f'features_round_{round_number}']):
-            print(f'Features in row are not only the text features')
-        features_list = pd.DataFrame(text_columns)  # features are only the text features for suffix rounds
-        features_list.to_excel(os.path.join(save_data_directory, f'features_{self.base_file_name}.xlsx'), index=True)
-
-        print(f'{time.asctime(time.localtime(time.time()))}: Finish create_non_nn_turn_model_features')
-        logging.info(f'{time.asctime(time.localtime(time.time()))}: Finish create_non_nn_turn_model_features')
 
     def split_data(self):
         """
@@ -778,11 +646,10 @@ def main():
                    'transformer_model': False,   # for transformer models
                    'prefix_data_in_sequence': False,  # if the prefix data is not in the suffix features but in the seq
                    'suffix_no_current_round_average_text': False,  # use the average text of all suffix trials in SVM-CR
-                   'label': 'future_total_payoff',  # single_round for DNN models, future_total_payoff for SVM-CR model
+                   'label': 'single_round',  # single_round for DNN models, future_total_payoff for SVM-CR model
                    }
     }
     use_prefix_suffix_setting = False  # relevant to all sequential models in the prefix_suffix setting
-    string_labels = False  # labels are string --> for LSTM and transformer model
     data_type = 'train_data'  # it can be train_data or test_data
     total_payoff_label = False if conditions_dict[condition]['label'] == 'single_round' else True
     features_to_drop = []  # if we don't want to use some of the features
@@ -812,13 +679,7 @@ def main():
                                           suffix_no_current_round_average_text=conditions_dict[condition][
                                               'suffix_no_current_round_average_text'])
 
-    if use_prefix_suffix_setting:
-        if create_save_data_obj.prefix_data_in_sequence:  # (LSTM, Trensformer)
-            create_save_data_obj.create_features_for_prefix_suffix_models(string_labels=string_labels)
-        if create_save_data_obj.non_nn_turn_model:  # flat the prefix data for the non_nn_turn_model (MVC, EWG)
-            create_save_data_obj.create_non_nn_turn_model_features()
-    else:
-        create_save_data_obj.create_info_df_per_pair_round()  # SVM-TR, MED, AVG
+    create_save_data_obj.create_info_df_per_pair_round()  # SVM-TR, MED, AVG
 
 
 if __name__ == '__main__':
