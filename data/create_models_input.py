@@ -14,9 +14,9 @@ from collections import defaultdict
 
 base_directory = os.path.abspath(os.curdir)
 condition = 'verbal'
-cv_framework = 'cv_framework'
+models_input = 'models_input'
 data_directory = os.path.join(base_directory, condition)
-save_data_directory = os.path.join(data_directory, cv_framework)
+save_data_directory = os.path.join(data_directory, models_input)
 if not os.path.exists(save_data_directory):
     os.makedirs(save_data_directory)
 
@@ -650,7 +650,7 @@ def main():
                    }
     }
     use_prefix_suffix_setting = False  # relevant to all sequential models in the prefix_suffix setting
-    data_type = 'train_data'  # it can be train_data or test_data
+    data_type = 'test_data'  # it can be train_data or test_data
     total_payoff_label = False if conditions_dict[condition]['label'] == 'single_round' else True
     features_to_drop = []  # if we don't want to use some of the features
     only_split_data = False  # if we just want to split data into folds and not create data
