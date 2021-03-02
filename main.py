@@ -139,6 +139,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     all_results_table_writer = pd.ExcelWriter(os.path.join(excel_models_results,
                                                            f'Results_fold_{fold}_all_models.xlsx'), engine='xlsxwriter')
     all_models_test_data_results = pd.DataFrame()
+    best_models_paths_dict = defaultdict(str)
 
     # load data
     data_path = os.path.join(base_directory, 'data', 'verbal', 'models_input', data_file_name)
@@ -224,6 +225,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
         model_file_name = f'{model_version_num}_{model_name}_fold_{fold}.pkl'
         trained_model_dir = os.path.join(base_directory, 'logs', model_folder, f'fold_{fold}')
         trained_model = joblib.load(os.path.join(trained_model_dir, model_file_name))
+        best_models_paths_dict[model_name] = os.path.join(trained_model_dir, model_file_name)
 
         metadata_dict = {'model_num': model_num, 'model_name': model_name,
                          'hyper_parameters_str': hyper_parameters_dict, 'fold': fold,
@@ -256,7 +258,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     logging.info(f'fold {fold} finish compare models')
     print(f'fold {fold} finish compare models')
 
-    return f'fold {fold} finish compare models'
+    return f'fold {fold} finish compare models', best_models_paths_dict
 
 
 def parallel_main(data_file_name: str, features_families: list, test_data_file_name:str):
@@ -275,7 +277,7 @@ def parallel_main(data_file_name: str, features_families: list, test_data_file_n
 
     ray.init()
 
-    all_ready_lng =\
+    all_ready_lng, models_paths_dict =\
         ray.get([execute_fold_parallel.remote(participants_fold_split[f'fold_{i}'], i, str(cuda_devices[i]),
                                               hyper_parameters_tune_mode=True, data_file_name=data_file_name,
                                               test_data_file_name=test_data_file_name,
@@ -285,7 +287,7 @@ def parallel_main(data_file_name: str, features_families: list, test_data_file_n
     print(f'Done! {all_ready_lng}')
     logging.info(f'Done! {all_ready_lng}')
 
-    return
+    return models_paths_dict
 
 
 def not_parallel_main(data_file_name: str, test_data_file_name: str, features_families: list, is_debug: bool=False,
@@ -298,16 +300,22 @@ def not_parallel_main(data_file_name: str, test_data_file_name: str, features_fa
     # the values will be train/test/validation
     participants_fold_split = pd.read_csv(os.path.join(data_directory, pair_folds_file_name))
     participants_fold_split.index = participants_fold_split.pair_id
+    models_paths_dict = None
 
     """For debug"""
     if is_debug:
         participants_fold_split = participants_fold_split.iloc[:50]
 
     for fold in range(num_folds):
-        execute_fold_parallel(participants_fold_split[f'fold_{fold}'], fold=fold, cuda_device='1',
-                              hyper_parameters_tune_mode=True, data_file_name=data_file_name,
-                              test_data_file_name=test_data_file_name,
-                              features_families=features_families)
+        _, models_paths_dict =\
+            execute_fold_parallel(participants_fold_split[f'fold_{fold}'], fold=fold, cuda_device='1',
+                                  hyper_parameters_tune_mode=True, data_file_name=data_file_name,
+                                  test_data_file_name=test_data_file_name, features_families=features_families)
+
+    if models_paths_dict is None:
+        print('No model paths were saved')
+
+    return models_paths_dict
 
 
 if __name__ == '__main__':
@@ -379,8 +387,10 @@ if __name__ == '__main__':
 
     # read function
     if is_parallel:
-        parallel_main(features_families=outer_features_families, data_file_name=outer_data_file_name,
-                      test_data_file_name=outer_test_data_file_name)
+        best_models_paths_dict =\
+            parallel_main(features_families=outer_features_families, data_file_name=outer_data_file_name,
+                          test_data_file_name=outer_test_data_file_name)
     else:
-        not_parallel_main(is_debug=outer_is_debug, features_families=outer_features_families,
-                          data_file_name=outer_data_file_name, test_data_file_name=outer_test_data_file_name)
+        best_models_paths_dict =\
+            not_parallel_main(is_debug=outer_is_debug, features_families=outer_features_families,
+                              data_file_name=outer_data_file_name, test_data_file_name=outer_test_data_file_name)
