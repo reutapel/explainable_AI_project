@@ -19,7 +19,7 @@ random.seed(123)
 # define directories
 base_directory = os.path.abspath(os.curdir)
 condition = 'verbal'
-data_directory = os.path.join(base_directory, 'data', condition, 'cv_framework')
+data_directory = os.path.join(base_directory, 'data', condition, 'models_input')
 pair_folds_file_name = 'pairs_folds_new_test_data.csv'
 
 os.environ['http_proxy'] = 'some proxy'
@@ -31,24 +31,24 @@ default_gridsearch_params = {
                 'gamma': 0, 'subsample': 1},
     'lightGBM': {'num_leaves': 31, 'max_depth': -1, 'learning_rate': 0.1, 'n_estimators': 100, 'subsample_for_bin': 50,
                  'min_child_samples': 20, 'reg_alpha': 0., 'reg_lambda': 0.},
-    'CatBoost': {'iterations': 500, 'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 30.},
+    'CatBoost': {'iterations': 500, 'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 3.0},
 }
 
 gridsearch_params = {
     'RandomForest': [{'n_estimators': n_estimators, 'max_depth': max_depth, 'min_samples_split': min_samples_split,
                       'min_samples_leaf': min_samples_leaf}
-                     for n_estimators in [0.0, 0.1, 0.2, 0.3]
-                     for max_depth in [50, 80, 100, 200]
-                     for min_samples_split in [1, 2, 3]
-                     for min_samples_leaf in [1, 2, 3]],
+                     for n_estimators in [50, 80, 100]
+                     for max_depth in [None, 3, 5, 8]
+                     for min_samples_split in [2, 3]
+                     for min_samples_leaf in [1, 2]],
     'XGBoost': [{'learning_rate': learning_rate, 'n_estimators': n_estimators, 'max_depth': max_depth,
                  'min_child_weight': min_child_weight, 'gamma': gamma, 'subsample': subsample}
                 for learning_rate in [0.0, 0.1, 0.2, 0.3]
-                for n_estimators in [50, 80, 100, 200]
-                for max_depth in [1, 2, 3]
-                for min_child_weight in [1, 2, 3]
-                for gamma in [1, 2, 3]
-                for subsample in [1, 2, 3]],
+                for n_estimators in [50, 80, 100]
+                for max_depth in [2, 3, 4]
+                for min_child_weight in [1, 2]
+                for gamma in [0, 1]
+                for subsample in [1]],
     'lightGBM': [{'num_leaves': num_leaves, 'max_depth': max_depth, 'learning_rate': learning_rate,
                  'n_estimators': n_estimators, 'subsample_for_bin': subsample_for_bin,
                   'min_child_samples': min_child_samples, 'reg_alpha': reg_alpha, 'reg_lambda': reg_lambda}
@@ -62,25 +62,28 @@ gridsearch_params = {
                  for reg_lambda in [1, 2, 3]],
     'CatBoost': [{'iterations': iterations, 'depth': depth, 'learning_rate': learning_rate,
                  'l2_leaf_reg': l2_leaf_reg}
-                 for iterations in [100, 150]
-                 for depth in [10]
-                 for learning_rate in [0.05, 0.1]
-                 for l2_leaf_reg in [3.0, 0.1]],
+                 for iterations in [100, 500]
+                 for depth in [6, 10, 16]
+                 for learning_rate in [0.03, 0.05, 0.1]
+                 for l2_leaf_reg in [3.0, 1.0]],
 }
 
 
 def execute_create_fit_predict_eval_model(model_num, features, train_x, train_y, test_x, test_y,
-                                          fold, fold_dir, model_name, table_writer,
-                                          hyper_parameters_dict, all_models_results, model_num_results_path):
+                                          fold, fold_dir, model_name, excel_models_results_folder,
+                                          hyper_parameters_dict, all_models_results, model_num_results_path,):
     metadata_dict = {'model_num': model_num, 'model_name': model_name,
                      'hyper_parameters_str': hyper_parameters_dict}
     metadata_df = pd.DataFrame.from_dict(metadata_dict, orient='index').T
+    print('Create model')
     model_class = predictive_models.PredictiveModel(
-        features, model_name, hyper_parameters_dict, model_num, fold, fold_dir, table_writer)
+        features, model_name, hyper_parameters_dict, model_num, fold, fold_dir, excel_models_results_folder)
+    print('Fit model')
     model_class.fit(train_x, train_y)
+    print('Predict model')
     predictions = model_class.predict(test_x, test_y)
     results_dict = utils.calculate_predictive_model_measures(all_predictions=predictions)
-    results_df = pd.DataFrame.from_dict(results_dict).T
+    results_df = pd.DataFrame(results_dict, index=[0])
     results_df = metadata_df.join(results_df)
     all_models_results = pd.concat([all_models_results, results_df], sort='False')
 
@@ -123,7 +126,6 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     test_table_writer = pd.ExcelWriter(os.path.join(excel_test_models_results, f'Results_test_data_best_models.xlsx'),
                                        engine='xlsxwriter')
 
-    table_writer = None
     log_file_name = os.path.join(fold_dir, f'LogFile_fold_{fold}.log')
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
@@ -134,7 +136,9 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                         )
 
     all_models_results = pd.DataFrame()
-    all_models_prediction_results = pd.DataFrame()
+    all_results_table_writer = pd.ExcelWriter(os.path.join(excel_models_results,
+                                                           f'Results_fold_{fold}_all_models.xlsx'), engine='xlsxwriter')
+    all_models_test_data_results = pd.DataFrame()
 
     # load data
     data_path = os.path.join(base_directory, 'data', 'verbal', 'models_input', data_file_name)
@@ -147,10 +151,10 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                                                                    features_families=features_families,
                                                                    test_pair_ids=validation_pair_ids,
                                                                    train_pair_ids=train_pair_ids)
-    _, _, test_y, test_x = utils.load_data(data_path=test_data_path, label_name='label',
+    _, _, test_x, test_y = utils.load_data(data_path=test_data_path, label_name='label',
                                            features_families=features_families, test_pair_ids=test_pair_ids)
 
-    model_names = ['RandomForest', 'XGBoost', 'lightGBM', 'CatBoost']
+    model_names = ['RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
 
     for model_num, model_name in enumerate(model_names):
         model_num_results_path = os.path.join(excel_models_results, f'model_name_results_{model_name}.pkl')
@@ -171,29 +175,27 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                 if os.path.isfile(os.path.join(excel_models_results, f'Results_fold_{fold}_model_{model_name}.xlsx')):
                     continue
                 new_model_num = f'{model_num}_{i}'
+                print(f'start model {model_name} with number {new_model_num} for fold {fold}')
                 all_models_results = execute_create_fit_predict_eval_model(
                     model_num=new_model_num, features=features_families, train_x=train_x, train_y=train_y,
                     test_x=validation_x, test_y=validation_y, fold=fold, fold_dir=fold_dir, model_name=model_name,
-                    table_writer=table_writer, hyper_parameters_dict=parameters_dict,
+                    excel_models_results_folder=excel_models_results, hyper_parameters_dict=parameters_dict,
                     all_models_results=all_models_results, model_num_results_path=model_num_results_path)
-
-            # select the best hyper-parameters set for this model based on the Accuracy
-            model_num_results = joblib.load(model_num_results_path)
-            if model_num_results.empty:
-                continue
-            argmax_index = model_num_results.Accuracy.argmax()
-            best_model = model_num_results.iloc[argmax_index]
 
         else:  # no hyper parameters
             parameters_dict = default_gridsearch_params[model_name]
             all_models_results = execute_create_fit_predict_eval_model(
                 model_num=model_num, features=features_families, train_x=train_x, train_y=train_y,
                 test_x=validation_x, test_y=validation_y, fold=fold, fold_dir=fold_dir, model_name=model_name,
-                table_writer=table_writer, hyper_parameters_dict=parameters_dict,
+                excel_models_results_folder=excel_models_results, hyper_parameters_dict=parameters_dict,
                 all_models_results=all_models_results, model_num_results_path=model_num_results_path)
 
-            best_model = all_models_results.iloc[0]
-
+        # select the best hyper-parameters set for this model based on the Accuracy
+        model_num_results = joblib.load(model_num_results_path)
+        if model_num_results.empty:
+            continue
+        argmax_index = model_num_results.Accuracy.argmax()
+        best_model = model_num_results.iloc[argmax_index]
         model_version_num = best_model.model_num
         logging.info(f'Best model version for model {model_num}-{model_name} in fold {fold} is: '
                      f'{model_version_num}. Start predict over test data')
@@ -228,21 +230,27 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                          'best_model_version_num': model_version_num}
 
         metadata_df = pd.DataFrame.from_dict(metadata_dict, orient='index').T
-        test_predictions = trained_model.predict(test_x, test_y)
-        results_dict = utils.calculate_predictive_model_measures(all_predictions=test_predictions)
-        results_df = pd.DataFrame.from_dict(results_dict).T
-        results_df = metadata_df.join(results_df)
-        all_models_prediction_results = pd.concat([all_models_prediction_results, results_df], sort='False')
-        utils.write_to_excel(trained_model.model_table_writer, 'Model results', ['Model results'],
-                             results_df)
-        trained_model.model_table_writer.save()
 
-    utils.write_to_excel(table_writer, 'All models results', ['All models results'], all_models_results)
-    if table_writer is not None:
-        table_writer.save()
+        # create model class with trained_model
+        test_model_class = predictive_models.PredictiveModel(
+            features_families, model_name, hyper_parameters_dict, model_num, fold, fold_dir,
+            excel_test_models_results, trained_model=trained_model)
+
+        test_predictions = test_model_class.predict(test_x, test_y)
+        results_dict = utils.calculate_predictive_model_measures(all_predictions=test_predictions)
+        results_df = pd.DataFrame(results_dict, index=[0])
+        results_df = metadata_df.join(results_df)
+        all_models_test_data_results = pd.concat([all_models_test_data_results, results_df], sort='False')
+        utils.write_to_excel(test_model_class.model_table_writer, 'Model results', ['Model results'],
+                             results_df)
+        test_model_class.model_table_writer.save()
+
+    utils.write_to_excel(all_results_table_writer, 'All models results', ['All models results'], all_models_results)
+    if all_results_table_writer is not None:
+        all_results_table_writer.save()
     if test_table_writer is not None:
         utils.write_to_excel(test_table_writer, 'All models results', ['All models results'],
-                             all_models_prediction_results)
+                             all_models_test_data_results)
         test_table_writer.save()
 
     logging.info(f'fold {fold} finish compare models')
@@ -365,7 +373,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 6:
         outer_is_debug = sys.argv[6]
     else:
-        outer_is_debug = True
+        outer_is_debug = False
     if outer_is_debug == 'False':
         outer_is_debug = False
 

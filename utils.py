@@ -6,6 +6,32 @@ from collections import defaultdict
 import sklearn.metrics as metrics
 import numpy as np
 
+base_directory = os.path.abspath(os.curdir)
+
+
+def set_folder(folder_name: str, father_folder_name: str = None, father_folder_path=None):
+    """
+    This function create new folder for results if does not exists
+    :param folder_name: the name of the folder to create
+    :param father_folder_name: the father name of the new folder
+    :param father_folder_path: if pass the father folder path and not name
+    :return: the new path or the father path if folder name is None
+    """
+    # create the father folder if not exists
+    if father_folder_name is not None:
+        path = os.path.join(base_directory, father_folder_name)
+    else:
+        path = father_folder_path
+    if not os.path.exists(path):
+        os.makedirs(path)
+    # create the folder
+    if folder_name is not None:
+        path = os.path.join(path, folder_name)
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    return path
+
 
 def save_model_prediction(model_to_dave, model_name: str, data_to_save: pd.DataFrame, fold_dir: str, fold: int,
                           model_num: int, table_writer, save_model: bool=True,):
@@ -13,9 +39,7 @@ def save_model_prediction(model_to_dave, model_name: str, data_to_save: pd.DataF
     Save the model predictions and the model itself
     :param data_to_save: the data to save
     :param save_model: whether to save the model
-    :param sheet_prefix_name: the sheet prefix name to save
     :param fold_dir: the fold we want to save the model in
-    :param element_to_save: if we want to save something that is not the model itself: {element_name: element}
     :return:
     """
 
@@ -88,22 +112,34 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
         data = pd.read_csv(data_path)
 
     if train_pair_ids is not None:
-        train_data = data.loc[data.pair_id.isin(train_pair_ids)]
+        if 'pair_id' in data.columns:
+            train_data = data.loc[data.pair_id.isin(train_pair_ids)]
+        elif 'meta_data' in data.columns and 'pair_id' in data.meta_data.columns:
+            train_data = data.loc[data.meta_data.pair_id.isin(train_pair_ids)]
+        else:
+            print('meta_data and pair_id not in data.columns')
+            raise ValueError
         train_y = train_data[label_name]
         train_x = train_data[features_families]
     else:
         train_y = None
         train_x = None
 
-    test_data = data.loc[data.pair_id.isin(test_pair_ids)]
+    if 'pair_id' in data.columns:
+        test_data = data.loc[data.pair_id.isin(test_pair_ids)]
+    elif 'meta_data' in data.columns and 'pair_id' in data.meta_data.columns:
+        test_data = data.loc[data.meta_data.pair_id.isin(test_pair_ids)]
+    else:
+        print('meta_data and pair_id not in data.columns')
+        raise ValueError
     test_y = test_data[label_name]
     test_x = test_data[features_families]
 
     return train_x, train_y, test_x, test_y
 
 
-def calculate_predictive_model_measures(all_predictions: pd.DataFrame, predictions_column: str='labels',
-                                        label_column: str='predictions',
+def calculate_predictive_model_measures(all_predictions: pd.DataFrame, predictions_column: str='predictions',
+                                        label_column: str='labels',
                                         label_options: list=['DM chose stay home', 'DM chose hotel']):
     """
 
@@ -117,6 +153,12 @@ def calculate_predictive_model_measures(all_predictions: pd.DataFrame, predictio
     precision, recall, fbeta_score, support =\
         metrics.precision_recall_fscore_support(all_predictions[label_column], all_predictions[predictions_column])
     accuracy = metrics.accuracy_score(all_predictions[label_column], all_predictions[predictions_column])
+    precision_micro, recall_micro, fbeta_score_micro, support_micro =\
+        metrics.precision_recall_fscore_support(all_predictions[label_column], all_predictions[predictions_column],
+                                                average='micro')
+    precision_macro, recall_macro, fbeta_score_macro, support_macro =\
+        metrics.precision_recall_fscore_support(all_predictions[label_column], all_predictions[predictions_column],
+                                                average='macro')
 
     # number of DM chose stay home
     final_labels = list(range(len(support)))
@@ -133,6 +175,11 @@ def calculate_predictive_model_measures(all_predictions: pd.DataFrame, predictio
     for measure, measure_name in [[precision, 'precision'], [recall, 'recall'], [fbeta_score, 'Fbeta_score']]:
         for i, label in enumerate(final_labels):
             results_dict[f'{measure_name}_{label}'] = round(measure[i]*100, 2)
-    results_dict[f'Accuracy'] = round(accuracy*100, 2)
+
+    for measure, measure_name in [[precision_micro, 'precision_micro'], [recall_micro, 'recall_micro'],
+                                  [fbeta_score_micro, 'Fbeta_score_micro'], [precision_macro, 'precision_macro'],
+                                  [recall_macro, 'recall_macro'], [fbeta_score_macro, 'Fbeta_score_macro']]:
+        results_dict[f'{measure_name}'] = round(measure * 100, 2)
+    results_dict[f'Accuracy'] = round(accuracy * 100, 2)
 
     return results_dict
