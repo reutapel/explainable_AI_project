@@ -63,9 +63,12 @@ gridsearch_params = {
     'CatBoost': [{'iterations': iterations, 'depth': depth, 'learning_rate': learning_rate,
                  'l2_leaf_reg': l2_leaf_reg}
                  for iterations in [100, 500]
-                 for depth in [6, 10, 16]
-                 for learning_rate in [0.03, 0.05, 0.1]
+                 for depth in [6, 10]
+                 for learning_rate in [0.03, 0.05]
                  for l2_leaf_reg in [3.0, 1.0]],
+    'SVM': [{'kernel': 'poly', 'degree': 3}, {'kernel': 'poly', 'degree': 5}, {'kernel': 'poly', 'degree': 8},
+            {'kernel': 'rbf', 'degree': 3}, {'kernel': 'linear', 'degree': 3}],
+    'most_frequent': [{}]
 }
 
 
@@ -155,7 +158,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     _, _, test_x, test_y = utils.load_data(data_path=test_data_path, label_name='label',
                                            features_families=features_families, test_pair_ids=test_pair_ids)
 
-    model_names = ['RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
+    model_names = ['SVM', 'most_frequent', 'RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
 
     for model_num, model_name in enumerate(model_names):
         model_num_results_path = os.path.join(excel_models_results, f'model_name_results_{model_name}.pkl')
@@ -359,8 +362,9 @@ if __name__ == '__main__':
         # the options are: 'history_behave_features', 'history_text_features', 'current_text_features'
         outer_features_families = ['history_behave_features', 'current_text_features']
 
-    run_dir_name = datetime.now().strftime(f'compare_prediction_models_%d_%m_%Y_%H_%M')
-    test_dir_name = datetime.now().strftime(f'predict_best_models_%d_%m_%Y_%H_%M')
+    run_dir_name =\
+        datetime.now().strftime(f'compare_prediction_models_features_{outer_features_families}_%d_%m_%Y_%H_%M')
+    test_dir_name = datetime.now().strftime(f'predict_best_models_features_{outer_features_families}_%d_%m_%Y_%H_%M')
     if len(sys.argv) > 5:
         folder_date = sys.argv[5]
         if folder_date != 'False':

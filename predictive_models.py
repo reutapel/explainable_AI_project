@@ -2,6 +2,8 @@ from xgboost.sklearn import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier
 # from lightgbm.sklearn import LGBMClassifier
 from catboost import CatBoostClassifier
+from sklearn.dummy import DummyClassifier
+from sklearn.svm import SVC
 import pandas as pd
 import logging
 import utils
@@ -23,7 +25,11 @@ class PredictiveModel:
             self.model = trained_model
 
         else:
-            if 'randomforest' in str.lower(model_name):
+            if 'svm' in str.lower(model_name):
+                self.model = SVC(kernel=hyper_parameters['kernel'], degree=hyper_parameters['degree'])
+            elif 'most_frequent' in str.lower(model_name):
+                self.model = DummyClassifier(strategy='most_frequent')
+            elif 'randomforest' in str.lower(model_name):
                 self.model = RandomForestClassifier(n_estimators=hyper_parameters['n_estimators'],
                                                     max_depth=hyper_parameters['max_depth'],
                                                     min_samples_split=hyper_parameters['min_samples_split'],
