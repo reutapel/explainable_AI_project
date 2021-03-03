@@ -41,7 +41,8 @@ alpha_global = 0.8
 global_prefix = 'raisha'
 global_suffix = 'saifa'
 crf_label_col_name = 'labels'
-prefix_history_col_name = 'history'
+prefix_history_text_col_name = 'history_text'
+prefix_history_behave_col_name = 'history_behave'
 prefix_future_col_name = 'future'
 prefix_suffix_col_name = 'suffix'
 curr_round_col_name = 'curr_round_feature'
@@ -110,7 +111,7 @@ def create_average_history_text(rounds: list, temp_reviews: pd.DataFrame):
         suffix_reviews = pd.concat([suffix_reviews, suffix_mean], axis=1, ignore_index=True, sort=False)
 
     history_reviews = history_reviews.T
-    history_reviews = rename_review_features_column(history_reviews, f'{prefix_history_col_name}_avg_feature')
+    history_reviews = rename_review_features_column(history_reviews, f'{prefix_history_text_col_name}_avg_feature')
     future_reviews = future_reviews.T
     future_reviews = rename_review_features_column(future_reviews, f'{prefix_future_col_name}_avg_feature')
     suffix_reviews = suffix_reviews.T
@@ -252,7 +253,8 @@ class CreateSaveData:
         :param no_decision_features: if we want to check models without decision features
         :param suffix_no_current_round_average_text: if we want the average of all suffix text
         """
-        print(f'Start create and save data for file: {os.path.join(data_directory, f"{load_file_name}_{data_type}.csv")}')
+        print(f'Start create and save data for file: '
+              f'{os.path.join(data_directory, f"{load_file_name}_{data_type}.csv")}')
         logging.info('Start create and save data for file: {}'.
                      format(os.path.join(data_directory, f'{load_file_name}_{data_type}.csv')))
 
@@ -401,21 +403,15 @@ class CreateSaveData:
                     else:
                         j = 1
                     if alpha_global == 0:  # if alpha == 0: use average
-                        history_data_dict[pair][f'history_{column}'] = round(history[column].mean(), 2)
-                        # data_to_create.loc[(data_to_create.pair_id == pair) &
-                        #                    (data_to_create.subsession_round_number == round_num),
-                        #                    f'history_{column}'] = round(history[column].mean(), 2)
+                        history_data_dict[pair][f'{prefix_history_behave_col_name}_{column}'] =\
+                            round(history[column].mean(), 2)
                     else:
-                        history_data_dict[pair][f'history_{column}'] =\
+                        history_data_dict[pair][f'{prefix_history_behave_col_name}_{column}'] =\
                             (pow(history[column], j) * weights).mean()
-                        # data_to_create.loc[(data_to_create.pair_id == pair) &
-                        #                    (data_to_create.subsession_round_number == round_num),
-                        #                    f'history_{column}'] = (pow(history[column], j) * weights).mean()
+
                     # for the first round put -1 for the history
                     if round_num == 1:
-                        history_data_dict[pair][f'history_{column}'] = -1
-                    # data_to_create.loc[(data_to_create.pair_id == pair) &
-                    #                    (data_to_create.subsession_round_number == 1), f'history_{column}'] = -1
+                        history_data_dict[pair][f'{prefix_history_behave_col_name}_{column}'] = -1
                 pair_history_data = pd.DataFrame.from_dict(history_data_dict).T
                 history_data = history_data.append(pair_history_data)
 
@@ -559,15 +555,18 @@ class CreateSaveData:
             self.final_data = self.final_data[columns_order]
 
         # create multi level columns to make it easier to use the df later
-        history_features = [column for column in self.final_data.columns if prefix_history_col_name in column]
+        history_behave_features =\
+            [column for column in self.final_data.columns if prefix_history_behave_col_name in column]
+        history_text_features = [column for column in self.final_data.columns if prefix_history_text_col_name in column]
         current_round_text_features = [column for column in self.final_data.columns if curr_round_col_name in column]
-        final_data_columns = meta_data_columns + history_features + current_round_text_features +\
-                             ['group_sender_answer_reviews', self.label]
+        final_data_columns = meta_data_columns + history_behave_features + history_text_features + \
+                             current_round_text_features + ['group_sender_answer_reviews', self.label]
         self.final_data = self.final_data[final_data_columns]
         # create tuples for multi level columns
         multi_level_column_names = list()
         multi_level_column_names.extend([('meta_data', column) for column in meta_data_columns])
-        multi_level_column_names.extend([('history_features', column) for column in history_features])
+        multi_level_column_names.extend([('history_behave_features', column) for column in history_behave_features])
+        multi_level_column_names.extend([('history_text_features', column) for column in history_text_features])
         multi_level_column_names.extend([('current_text_features', column) for column in current_round_text_features])
         multi_level_column_names.append(('plain_text', 'group_sender_answer_reviews'))
         multi_level_column_names.append(('label', self.label))
@@ -650,7 +649,7 @@ def main():
                    }
     }
     use_prefix_suffix_setting = False  # relevant to all sequential models in the prefix_suffix setting
-    data_type = 'test_data'  # it can be train_data or test_data
+    data_type = 'train_data'  # it can be train_data or test_data
     total_payoff_label = False if conditions_dict[condition]['label'] == 'single_round' else True
     features_to_drop = []  # if we don't want to use some of the features
     only_split_data = False  # if we just want to split data into folds and not create data

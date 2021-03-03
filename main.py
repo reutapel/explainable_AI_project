@@ -356,7 +356,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 4:
         outer_features_families = sys.argv[4]
     else:
-        outer_features_families = ['history_features', 'current_text_features']
+        # the options are: 'history_behave_features', 'history_text_features', 'current_text_features'
+        outer_features_families = ['history_behave_features', 'current_text_features']
 
     run_dir_name = datetime.now().strftime(f'compare_prediction_models_%d_%m_%Y_%H_%M')
     test_dir_name = datetime.now().strftime(f'predict_best_models_%d_%m_%Y_%H_%M')
