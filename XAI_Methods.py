@@ -54,12 +54,14 @@ class XAIMethods:
 
 
 if __name__ == '__main__':
-    pkl_model_path = '0_0_RandomForest_fold_0.pkl'
+    pkl_model_path = '2_47_RandomForest_fold_0.pkl'
     model = joblib.load(pkl_model_path)
-    X_path = "data/verbal/models_input/all_data_single_round_label_all_history_features_avg_with_global_alpha_0.8_all_history_text_avg_with_alpha_0.9_['hand_crafted_features']_use_decision_features_verbal_test_data.pkl"
+    # X_path = "data/verbal/models_input/all_data_single_round_label_all_history_features_avg_with_global_alpha_0.8_all_history_text_avg_with_alpha_0.9_['hand_crafted_features']_use_decision_features_verbal_test_data.pkl"
+    X_path = "all_data_single_round_label_all_history_features_avg_with_global_alpha_0.8_all_history_text_avg_with_alpha_0.9_['hand_crafted_features']_use_decision_features_verbal_test_data.pkl"
     X = joblib.load(X_path)
-    X = X[['history_features', 'current_text_features']]
+    X = X[['history_behave_features', 'current_text_features']]
 
     shap_obj = XAIMethods(model,X,'SHAP')
-    shap_obj.get_shap_feature_mean_values()
+    shap_res = shap_obj.get_shap_feature_mean_values()
+    shap_res.to_csv('shap_res.csv')
     print()
