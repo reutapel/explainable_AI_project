@@ -20,7 +20,10 @@ random.seed(123)
 base_directory = os.path.abspath(os.curdir)
 condition = 'verbal'
 data_directory = os.path.join(base_directory, 'data', condition, 'models_input')
-pair_folds_file_name = 'pairs_folds_new_test_data.csv'
+pair_folds_file_name = 'reviews_folds.csv'
+
+measures = {'regression': [['RMSE', 'MSE', 'MAE'], 'calculate_continues_predictive_model_measures'],
+            'classification': [['Accuracy', 'F-score'], 'calculate_predictive_model_measures']}
 
 os.environ['http_proxy'] = 'some proxy'
 os.environ['https_proxy'] = 'some proxy'
@@ -68,24 +71,26 @@ gridsearch_params = {
                  for l2_leaf_reg in [3.0, 1.0]],
     'SVM': [{'kernel': 'poly', 'degree': 3}, {'kernel': 'poly', 'degree': 5}, {'kernel': 'poly', 'degree': 8},
             {'kernel': 'rbf', 'degree': 3}, {'kernel': 'linear', 'degree': 3}],
-    'most_frequent': [{}]
+    'most_frequent': [{}],
+    'mean': [{}],
+    'median': [{}]
 }
 
 
 def execute_create_fit_predict_eval_model(model_num, features, train_x, train_y, test_x, test_y,
-                                          fold, fold_dir, model_name, excel_models_results_folder,
-                                          hyper_parameters_dict, all_models_results, model_num_results_path,):
+                                          fold, fold_dir, model_name, excel_models_results_folder, model_type,
+                                          hyper_parameters_dict, all_models_results, model_num_results_path):
     metadata_dict = {'model_num': model_num, 'model_name': model_name,
                      'hyper_parameters_str': hyper_parameters_dict}
     metadata_df = pd.DataFrame.from_dict(metadata_dict, orient='index').T
     print('Create model')
-    model_class = predictive_models.PredictiveModel(
-        features, model_name, hyper_parameters_dict, model_num, fold, fold_dir, excel_models_results_folder)
+    model_class = predictive_models.PredictiveModel(features, model_name, hyper_parameters_dict, model_num, fold,
+                                                    fold_dir, excel_models_results_folder, model_type=model_type)
     print('Fit model')
     model_class.fit(train_x, train_y)
     print('Predict model')
     predictions = model_class.predict(test_x, test_y)
-    results_dict = utils.calculate_predictive_model_measures(all_predictions=predictions)
+    results_dict = getattr(utils, measures[model_type][1])(all_predictions=predictions)
     results_df = pd.DataFrame(results_dict, index=[0])
     results_df = metadata_df.join(results_df)
     all_models_results = pd.concat([all_models_results, results_df], sort='False')
@@ -100,7 +105,8 @@ def execute_create_fit_predict_eval_model(model_num, features, train_x, train_y,
 
 # @ray.remote
 def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: str, data_file_name: str,
-                          test_data_file_name: str, features_families: list, hyper_parameters_tune_mode: bool=False):
+                          features_families: list, hyper_parameters_tune_mode: bool=False,
+                          test_data_file_name: str=None, id_column: str='pair_id', model_type: str='regression'):
     """
     This function get a dict that split the participant to train-val-test (for this fold) and run all the models
     we want to compare --> it train them using the train data and evaluate them using the val data
@@ -110,6 +116,9 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     :param hyper_parameters_tune_mode: after find good data - hyper parameter tuning
     :param data_file_name: the data file name
     :param features_families: the families of features to use
+    :param id_column: the name of the ID column
+    :param test_data_file_name: the test_data_file_name
+    :param model_type: is this a regression model or a classification model
     :return:
     """
     # get the train, test, validation participant code for this fold
@@ -125,7 +134,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     excel_test_models_results = utils.set_folder(folder_name='excel_best_models_results',
                                                  father_folder_path=test_fold_dir)
     test_participants_fold = pd.read_csv(os.path.join(data_directory, pair_folds_file_name))
-    test_participants_fold.index = test_participants_fold.pair_id
+    test_participants_fold.index = test_participants_fold[id_column]
     test_table_writer = pd.ExcelWriter(os.path.join(excel_test_models_results, f'Results_test_data_best_models.xlsx'),
                                        engine='xlsxwriter')
 
@@ -146,7 +155,10 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
 
     # load data
     data_path = os.path.join(base_directory, 'data', 'verbal', 'models_input', data_file_name)
-    test_data_path = os.path.join(base_directory, 'data', 'verbal', 'models_input', test_data_file_name)
+    if test_data_file_name is None:
+        test_data_path = data_path
+    else:
+        test_data_path = os.path.join(base_directory, 'data', 'verbal', 'models_input', test_data_file_name)
     train_pair_ids = participants_fold.loc[participants_fold == 'train'].index.tolist()
     validation_pair_ids = participants_fold.loc[participants_fold == 'validation'].index.tolist()
     test_pair_ids = participants_fold.loc[participants_fold == 'test'].index.tolist()
@@ -154,16 +166,16 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     train_x, train_y, validation_x, validation_y = utils.load_data(data_path=data_path, label_name='label',
                                                                    features_families=features_families,
                                                                    test_pair_ids=validation_pair_ids,
-                                                                   train_pair_ids=train_pair_ids)
-    _, _, test_x, test_y = utils.load_data(data_path=test_data_path, label_name='label',
+                                                                   train_pair_ids=train_pair_ids, id_column=id_column)
+    _, _, test_x, test_y = utils.load_data(data_path=test_data_path, label_name='label', id_column=id_column,
                                            features_families=features_families, test_pair_ids=test_pair_ids)
 
-    model_names = ['SVM', 'most_frequent', 'RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
+    model_names = ['SVM', 'mean', 'median', 'RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
 
     for model_num, model_name in enumerate(model_names):
         model_num_results_path = os.path.join(excel_models_results, f'model_name_results_{model_name}.pkl')
         if not os.path.isfile(model_num_results_path):
-            model_num_results = pd.DataFrame(columns=['model_name', 'hyper_parameters_str', 'Accuracy', 'F-score'])
+            model_num_results = pd.DataFrame(columns=['model_name', 'hyper_parameters_str'] + measures[model_type][0])
             joblib.dump(model_num_results, model_num_results_path)
 
         # each function need to get: model_num, fold, fold_dir, model_type, model_name,
@@ -184,7 +196,8 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                     model_num=new_model_num, features=features_families, train_x=train_x, train_y=train_y,
                     test_x=validation_x, test_y=validation_y, fold=fold, fold_dir=fold_dir, model_name=model_name,
                     excel_models_results_folder=excel_models_results, hyper_parameters_dict=parameters_dict,
-                    all_models_results=all_models_results, model_num_results_path=model_num_results_path)
+                    all_models_results=all_models_results, model_num_results_path=model_num_results_path,
+                    model_type=model_type)
 
         else:  # no hyper parameters
             parameters_dict = default_gridsearch_params[model_name]
@@ -192,13 +205,20 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                 model_num=model_num, features=features_families, train_x=train_x, train_y=train_y,
                 test_x=validation_x, test_y=validation_y, fold=fold, fold_dir=fold_dir, model_name=model_name,
                 excel_models_results_folder=excel_models_results, hyper_parameters_dict=parameters_dict,
-                all_models_results=all_models_results, model_num_results_path=model_num_results_path)
+                all_models_results=all_models_results, model_num_results_path=model_num_results_path,
+                model_type=model_type)
 
         # select the best hyper-parameters set for this model based on the Accuracy
         model_num_results = joblib.load(model_num_results_path)
         if model_num_results.empty:
             continue
-        argmax_index = model_num_results.Accuracy.argmax()
+        # measures[model_type][0] is the measure to choose the best model
+        if model_type == 'regression':
+            argmax_index = model_num_results[measures[model_type][0][0]].argmin()
+        elif model_type == 'classification':
+            argmax_index = model_num_results[measures[model_type][0][0]].argmax()
+        else:
+            raise ValueError('model_type must be regression or classification')
         best_model = model_num_results.iloc[argmax_index]
         model_version_num = best_model.model_num
         logging.info(f'Best model version for model {model_num}-{model_name} in fold {fold} is: '
@@ -239,10 +259,10 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
         # create model class with trained_model
         test_model_class = predictive_models.PredictiveModel(
             features_families, model_name, hyper_parameters_dict, model_num, fold, fold_dir,
-            excel_test_models_results, trained_model=trained_model)
+            excel_test_models_results, trained_model=trained_model, model_type=model_type)
 
         test_predictions = test_model_class.predict(test_x, test_y)
-        results_dict = utils.calculate_predictive_model_measures(all_predictions=test_predictions)
+        results_dict = getattr(utils, measures[model_type][1])(all_predictions=test_predictions)
         results_df = pd.DataFrame(results_dict, index=[0])
         results_df = metadata_df.join(results_df)
         all_models_test_data_results = pd.concat([all_models_test_data_results, results_df], sort='False')
@@ -264,7 +284,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     return f'fold {fold} finish compare models', best_models_paths_dict
 
 
-def parallel_main(data_file_name: str, features_families: list, test_data_file_name:str):
+def parallel_main(data_file_name: str, features_families: list, test_data_file_name: str, model_type: str):
     print(f'Start run in parallel: for each fold compare all the models')
     logging.info(f'Start run in parallel: for each fold compare all the models')
 
@@ -272,7 +292,12 @@ def parallel_main(data_file_name: str, features_families: list, test_data_file_n
     # the index should be the participant code
     # the values will be train/test/validation
     participants_fold_split = pd.read_csv(os.path.join(data_directory, pair_folds_file_name))
-    participants_fold_split.index = participants_fold_split.pair_id
+    if 'review_id' in participants_fold_split.columns:
+        id_column = 'review_id'
+        participants_fold_split.index = participants_fold_split.review_id
+    else:
+        participants_fold_split.index = participants_fold_split.pair_id
+        id_column = 'pair_id'
 
     cuda_devices = {0: 0, 1: 1,
                     2: 0, 3: 1,
@@ -283,8 +308,8 @@ def parallel_main(data_file_name: str, features_families: list, test_data_file_n
     all_ready_lng, models_paths_dict =\
         ray.get([execute_fold_parallel.remote(participants_fold_split[f'fold_{i}'], i, str(cuda_devices[i]),
                                               hyper_parameters_tune_mode=True, data_file_name=data_file_name,
-                                              test_data_file_name=test_data_file_name,
-                                              features_families=features_families)
+                                              test_data_file_name=test_data_file_name, model_type=model_type,
+                                              features_families=features_families, id_column=id_column)
                  for i in range(6)])
 
     print(f'Done! {all_ready_lng}')
@@ -293,8 +318,8 @@ def parallel_main(data_file_name: str, features_families: list, test_data_file_n
     return models_paths_dict
 
 
-def not_parallel_main(data_file_name: str, test_data_file_name: str, features_families: list, is_debug: bool=False,
-                      num_folds: int=1):
+def not_parallel_main(data_file_name: str, test_data_file_name: str, features_families: list, model_type: str,
+                      is_debug: bool=False, num_folds: int=1):
     print(f'Start run in parallel: for each fold compare all the models')
     logging.info(f'Start run in parallel: for each fold compare all the models')
 
@@ -302,7 +327,12 @@ def not_parallel_main(data_file_name: str, test_data_file_name: str, features_fa
     # the index should be the participant code
     # the values will be train/test/validation
     participants_fold_split = pd.read_csv(os.path.join(data_directory, pair_folds_file_name))
-    participants_fold_split.index = participants_fold_split.pair_id
+    if 'review_id' in participants_fold_split.columns:
+        id_column = 'review_id'
+        participants_fold_split.index = participants_fold_split.review_id
+    else:
+        participants_fold_split.index = participants_fold_split.pair_id
+        id_column = 'pair_id'
     models_paths_dict = None
 
     """For debug"""
@@ -313,7 +343,8 @@ def not_parallel_main(data_file_name: str, test_data_file_name: str, features_fa
         _, models_paths_dict =\
             execute_fold_parallel(participants_fold_split[f'fold_{fold}'], fold=fold, cuda_device='1',
                                   hyper_parameters_tune_mode=True, data_file_name=data_file_name,
-                                  test_data_file_name=test_data_file_name, features_families=features_families)
+                                  test_data_file_name=test_data_file_name, features_families=features_families,
+                                  id_column=id_column, model_type=model_type)
 
     if models_paths_dict is None:
         print('No model paths were saved')
@@ -329,6 +360,7 @@ if __name__ == '__main__':
     sys.argv[4] = outer_features_families
     sys.argv[5] = folder_date
     sys.argv[6] = is_debug
+    sys.argv[7] = model_type: regression/ classification
     """
 
     # is_parallel
@@ -344,23 +376,21 @@ if __name__ == '__main__':
         outer_data_file_name = sys.argv[2]
     else:
         outer_data_file_name =\
-            "all_data_single_round_label_all_history_features_avg_with_global_alpha_0.8_all_history_text_avg_with_" \
-            "alpha_0.9_['hand_crafted_features']_use_decision_features_verbal_train_data.pkl"
+            "all_data_proportion_label_['hand_crafted_features']_use_decision_features_verbal_test_data.pkl"
 
     # outer_test_data_file_name
     if len(sys.argv) > 3:
         outer_test_data_file_name = sys.argv[3]
     else:
         outer_test_data_file_name =\
-            "all_data_single_round_label_all_history_features_avg_with_global_alpha_0.8_all_history_text_avg_with_" \
-            "alpha_0.9_['hand_crafted_features']_use_decision_features_verbal_test_data.pkl"
+            "all_data_proportion_label_['hand_crafted_features']_use_decision_features_verbal_test_data.pkl"
 
     # outer_features_families
     if len(sys.argv) > 4:
         outer_features_families = sys.argv[4]
     else:
         # the options are: 'history_behave_features', 'history_text_features', 'current_text_features'
-        outer_features_families = ['history_behave_features', 'current_text_features']
+        outer_features_families = ['text_features']
 
     run_dir_name =\
         datetime.now().strftime(f'compare_prediction_models_features_{outer_features_families}_%d_%m_%Y_%H_%M')
@@ -390,12 +420,19 @@ if __name__ == '__main__':
     if outer_is_debug == 'False':
         outer_is_debug = False
 
+    # outer_model_type
+    if len(sys.argv) > 7:
+        outer_model_type = sys.argv[7]
+    else:
+        outer_model_type = 'regression'
+
     # read function
     if is_parallel:
         best_models_paths_dict =\
             parallel_main(features_families=outer_features_families, data_file_name=outer_data_file_name,
-                          test_data_file_name=outer_test_data_file_name)
+                          test_data_file_name=outer_test_data_file_name, model_type=outer_model_type)
     else:
         best_models_paths_dict =\
             not_parallel_main(is_debug=outer_is_debug, features_families=outer_features_families,
-                              data_file_name=outer_data_file_name, test_data_file_name=outer_test_data_file_name)
+                              data_file_name=outer_data_file_name, test_data_file_name=outer_test_data_file_name,
+                              model_type=outer_model_type)
