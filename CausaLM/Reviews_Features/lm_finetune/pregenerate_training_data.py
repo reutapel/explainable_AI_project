@@ -6,16 +6,16 @@ import shelve
 from multiprocessing import Pool
 from typing import List, Collection
 from random import random, randrange, randint, choice
-from transformers.tokenization_bert import BertTokenizer
+from transformers.models.bert.tokenization_bert import BertTokenizer
 import pandas as pd
 import numpy as np
 import json
 import collections
-from constants import BERT_PRETRAINED_MODEL, SENTIMENT_TOPICS_PRETRAIN_DATA_DIR, MAX_SENTIMENT_SEQ_LENGTH, \
+from CausaLM.constants import BERT_PRETRAINED_MODEL, SENTIMENT_TOPICS_PRETRAIN_DATA_DIR, MAX_SENTIMENT_SEQ_LENGTH, \
     SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, SENTIMENT_DOMAINS
 
 
-from datasets.utils import WORDPIECE_PREFIX, MASK_TOKEN, CLS_TOKEN, SEP_TOKEN
+from CausaLM.datasets.utils import WORDPIECE_PREFIX, MASK_TOKEN, CLS_TOKEN, SEP_TOKEN
 
 EPOCHS = 5
 MLM_PROB = 0.15

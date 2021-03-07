@@ -4,15 +4,15 @@ from torch.utils.data.dataloader import DataLoader
 from pytorch_lightning import LightningModule, data_loader
 from tqdm import tqdm
 from transformers import BertConfig, BertForTokenClassification
-from BERT.bert_text_dataset import BertTextDataset, InputExample, InputFeatures, InputLabel, truncate_seq_first
-from BERT.bert_text_classifier import LightningHyperparameters, BertPretrainedClassifier
+from CausaLM.BERT.bert_text_dataset import BertTextDataset, InputExample, InputFeatures, InputLabel, truncate_seq_first
+from CausaLM.BERT.bert_text_classifier import LightningHyperparameters, BertPretrainedClassifier
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-from datasets.utils import CLS_TOKEN, SEP_TOKEN, TOKEN_SEPARATOR, NUM_POS_TAGS_LABELS
-from constants import NUM_CPU, MAX_SENTIMENT_SEQ_LENGTH, BERT_PRETRAINED_MODEL
-from utils import save_predictions
+from CausaLM.datasets.utils import CLS_TOKEN, SEP_TOKEN, TOKEN_SEPARATOR, NUM_POS_TAGS_LABELS
+from CausaLM.constants import NUM_CPU, MAX_SENTIMENT_SEQ_LENGTH, BERT_PRETRAINED_MODEL
+from CausaLM.utils import save_predictions
 
 
 class LightningBertPOSTagger(LightningModule):

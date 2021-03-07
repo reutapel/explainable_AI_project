@@ -1,12 +1,12 @@
 import json
 from argparse import ArgumentParser
-from constants import SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_EXPERIMENTS_DIR, \
+from CausaLM.constants import SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_EXPERIMENTS_DIR, \
     SENTIMENT_TOPICS_PRETRAIN_MLM_DIR, SENTIMENT_TOPICS_PRETRAIN_IXT_DIR, SENTIMENT_DOMAINS, \
     SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE
 from pytorch_lightning import Trainer, LightningModule
-from BERT.bert_text_classifier import LightningBertPretrainedClassifier, BertPretrainedClassifier
+from CausaLM.BERT.bert_text_classifier import LightningBertPretrainedClassifier, BertPretrainedClassifier
 from copy import deepcopy
-from utils import GoogleDriveHandler, init_logger, print_final_metrics, find_latest_model_checkpoint
+from CausaLM.utils import GoogleDriveHandler, init_logger, print_final_metrics, find_latest_model_checkpoint
 import torch
 
 
