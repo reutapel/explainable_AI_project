@@ -117,8 +117,10 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
     if train_pair_ids is not None:
         if id_column in data.columns:
             train_data = data.loc[data[id_column].isin(train_pair_ids)]
+            train_data.index = train_data[id_column]
         elif 'meta_data' in data.columns and id_column in data.meta_data.columns:
             train_data = data.loc[data.meta_data[id_column].isin(train_pair_ids)]
+            train_data.index = train_data.meta_data[id_column]
         else:
             print(f'meta_data and {id_column} not in data.columns')
             raise ValueError
@@ -130,8 +132,10 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
 
     if id_column in data.columns:
         test_data = data.loc[data[id_column].isin(test_pair_ids)]
+        test_data.index = test_data[id_column]
     elif 'meta_data' in data.columns and id_column in data.meta_data.columns:
         test_data = data.loc[data.meta_data[id_column].isin(test_pair_ids)]
+        test_data.index = test_data.meta_data[id_column]
     else:
         print(f'meta_data and {id_column} not in data.columns')
         raise ValueError

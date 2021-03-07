@@ -13,6 +13,7 @@ import utils
 import pickle
 import joblib
 
+
 class XAIMethods:
     def __init__(self, model, X, method_name: str):
         self.model = model

@@ -13,7 +13,7 @@ import copy
 import random
 import joblib
 import sys
-import XAI_Methods
+# import XAI_Methods
 from pathlib import Path
 
 random.seed(123)
@@ -353,7 +353,7 @@ def not_parallel_main(data_file_name: str, test_data_file_name: str, features_fa
     for fold in range(num_folds):
         _, models_paths_dict =\
             execute_fold_parallel(participants_fold_split[f'fold_{fold}'], fold=fold, cuda_device='1',
-                                  hyper_parameters_tune_mode=False, data_file_name=data_file_name,
+                                  hyper_parameters_tune_mode=True, data_file_name=data_file_name,
                                   test_data_file_name=test_data_file_name, features_families=features_families,
                                   id_column=id_column, model_type=model_type)
 
@@ -449,21 +449,21 @@ if __name__ == '__main__':
                               data_file_name=outer_data_file_name, test_data_file_name=outer_test_data_file_name,
                               model_type=outer_model_type)
 
-    #todo: add shap here
-        for model in best_models_paths_dict.keys():
-            print(f'computing SHAP values of {model}')
-            pkl_model_path = Path(best_models_paths_dict[model])
-            model = joblib.load(pkl_model_path)
-            root_path = Path("data/verbal/models_input")
-            X_path = root_path.joinpath(outer_test_data_file_name)
-            X = joblib.load(X_path)
-            X = X[['history_features', 'current_text_features']]
-
-            # create a file for the SHAP results to be saved at
-            save_shap_values_path = pkl_model_path.parent.joinpath('SAHP_values_results')
-            save_shap_values_path.mkdir(exist_ok=True)
-
-            shap_obj = XAI_Methods.XAIMethods(model, X, 'SHAP')
-            shap_res = shap_obj.get_shap_feature_mean_values()
-            shap_res.to_csv(save_shap_values_path.joinpath(pkl_model_path.name.replace('pkl','csv')))
-            print()
+    # # todo: add shap here
+    #     for model in best_models_paths_dict.keys():
+    #         print(f'computing SHAP values of {model}')
+    #         pkl_model_path = Path(best_models_paths_dict[model])
+    #         model = joblib.load(pkl_model_path)
+    #         root_path = Path("data/verbal/models_input")
+    #         X_path = root_path.joinpath(outer_test_data_file_name)
+    #         X = joblib.load(X_path)
+    #         X = X[['history_features', 'current_text_features']]
+    #
+    #         # create a file for the SHAP results to be saved at
+    #         save_shap_values_path = pkl_model_path.parent.joinpath('SAHP_values_results')
+    #         save_shap_values_path.mkdir(exist_ok=True)
+    #
+    #         shap_obj = XAI_Methods.XAIMethods(model, X, 'SHAP')
+    #         shap_res = shap_obj.get_shap_feature_mean_values()
+    #         shap_res.to_csv(save_shap_values_path.joinpath(pkl_model_path.name.replace('pkl','csv')))
+    #         print()
