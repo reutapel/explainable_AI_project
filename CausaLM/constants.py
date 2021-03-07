@@ -1,7 +1,7 @@
 from os import path
 from CausaLM.utils import count_num_cpu_gpu
 
-CAUSALM_DIR = path.dirname(path.realpath(__file__)) # This must be set to the path which specifies where the CausaLM project resides
+CAUSALM_DIR = path.dirname(path.realpath(__file__))  # This must be set to the path which specifies where the CausaLM project resides
 
 NUM_CPU = count_num_cpu_gpu()[0]
 NUM_GPU = 1
@@ -31,6 +31,15 @@ SENTIMENT_TOPICS_PRETRAIN_DIR = f"{SENTIMENT_TOPICS_MODELS_DIR}/Pretrain"
 SENTIMENT_TOPICS_PRETRAIN_DATA_DIR = f"{SENTIMENT_TOPICS_PRETRAIN_DIR}/data"
 SENTIMENT_TOPICS_PRETRAIN_MLM_DIR = f"{SENTIMENT_TOPICS_PRETRAIN_DIR}/MLM"
 SENTIMENT_TOPICS_PRETRAIN_IXT_DIR = f"{SENTIMENT_TOPICS_PRETRAIN_DIR}/IXT"
+
+REVIEWS_FEATURES_DATASETS_DIR = f"{CAUSALM_DIR}/Reviews_Features/datasets"
+REVIEWS_FEATURES_MODELS_DIR = f"{MODELS_DIR}/Reviews_Features"
+REVIEWS_FEATURES_PRETRAIN_DIR = f"{MODELS_DIR}/Pretrain"
+REVIEWS_FEATURES_PRETRAIN_DATA_DIR = f"{REVIEWS_FEATURES_PRETRAIN_DIR}/data"
+REVIEWS_FEATURES_PRETRAIN_MLM_DIR = f"{REVIEWS_FEATURES_PRETRAIN_DIR}/MLM"
+REVIEWS_FEATURES_PRETRAIN_IXT_DIR = f"{REVIEWS_FEATURES_PRETRAIN_DIR}/IXT"
+
+REVIEWS_FEATURES_DOMAIN_TREAT_CONTROL_MAP_FILE = f"{REVIEWS_FEATURES_DATASETS_DIR}/reviews_features_treat_control.json"
 
 SENTIMENT_DOMAINS = ("movies", "books", "electronics", "kitchen", "dvd")
 SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE = f"{SENTIMENT_TOPICS_DATASETS_DIR}/domain_treat_control_topics.json"
