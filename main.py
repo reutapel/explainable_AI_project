@@ -35,6 +35,11 @@ default_gridsearch_params = {
     'lightGBM': {'num_leaves': 31, 'max_depth': -1, 'learning_rate': 0.1, 'n_estimators': 100, 'subsample_for_bin': 50,
                  'min_child_samples': 20, 'reg_alpha': 0., 'reg_lambda': 0.},
     'CatBoost': {'iterations': 500, 'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 3.0},
+    'SVM': {'kernel': 'rbf', 'degree': 3},
+    'most_frequent': {},
+    'mean': {},
+    'median': {}
+
 }
 
 gridsearch_params = {
