@@ -5,6 +5,7 @@ import os
 from collections import defaultdict
 import sklearn.metrics as metrics
 import numpy as np
+import math
 
 base_directory = os.path.abspath(os.curdir)
 
@@ -95,7 +96,8 @@ def write_to_excel(table_writer: pd.ExcelWriter, sheet_name: str, headers: list,
     return
 
 
-def load_data(data_path: str, label_name: str, features_families: list,  test_pair_ids: list, train_pair_ids: list=None):
+def load_data(data_path: str, label_name: str, features_families: list,  test_pair_ids: list, train_pair_ids: list=None,
+              id_column: str='pair_id'):
     """
     Load data from data_path and return: train_x, train_y, test_x, test_y
     :param data_path: path to data
@@ -103,6 +105,7 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
     :param features_families: the families of feautres to use
     :param train_pair_ids: the pair ids for train data, if None- return only test data
     :param test_pair_ids: the pair ids for test data
+    :param id_column: the name of the ID columns
     :return:
     """
 
@@ -112,12 +115,12 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
         data = pd.read_csv(data_path)
 
     if train_pair_ids is not None:
-        if 'pair_id' in data.columns:
-            train_data = data.loc[data.pair_id.isin(train_pair_ids)]
-        elif 'meta_data' in data.columns and 'pair_id' in data.meta_data.columns:
-            train_data = data.loc[data.meta_data.pair_id.isin(train_pair_ids)]
+        if id_column in data.columns:
+            train_data = data.loc[data[id_column].isin(train_pair_ids)]
+        elif 'meta_data' in data.columns and id_column in data.meta_data.columns:
+            train_data = data.loc[data.meta_data[id_column].isin(train_pair_ids)]
         else:
-            print('meta_data and pair_id not in data.columns')
+            print(f'meta_data and {id_column} not in data.columns')
             raise ValueError
         train_y = train_data[label_name]
         train_x = train_data[features_families]
@@ -125,12 +128,12 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
         train_y = None
         train_x = None
 
-    if 'pair_id' in data.columns:
-        test_data = data.loc[data.pair_id.isin(test_pair_ids)]
-    elif 'meta_data' in data.columns and 'pair_id' in data.meta_data.columns:
-        test_data = data.loc[data.meta_data.pair_id.isin(test_pair_ids)]
+    if id_column in data.columns:
+        test_data = data.loc[data[id_column].isin(test_pair_ids)]
+    elif 'meta_data' in data.columns and id_column in data.meta_data.columns:
+        test_data = data.loc[data.meta_data[id_column].isin(test_pair_ids)]
     else:
-        print('meta_data and pair_id not in data.columns')
+        print(f'meta_data and {id_column} not in data.columns')
         raise ValueError
     test_y = test_data[label_name]
     test_x = test_data[features_families]
@@ -181,5 +184,29 @@ def calculate_predictive_model_measures(all_predictions: pd.DataFrame, predictio
                                   [recall_macro, 'recall_macro'], [fbeta_score_macro, 'Fbeta_score_macro']]:
         results_dict[f'{measure_name}'] = round(measure * 100, 2)
     results_dict[f'Accuracy'] = round(accuracy * 100, 2)
+
+    return results_dict
+
+
+def calculate_continues_predictive_model_measures(all_predictions: pd.DataFrame, predictions_column: str='predictions',
+                                                  label_column: str='labels'):
+    """
+
+    :param all_predictions: the predictions and the labels to calculate the measures on
+    :param predictions_column: the name of the prediction column
+    :param label_column: the name of the label column
+    :return:
+    """
+    results_dict = defaultdict(dict)
+    predictions = all_predictions[predictions_column]
+    gold_labels = all_predictions[label_column]
+    mse = metrics.mean_squared_error(predictions, gold_labels)
+    rmse = math.sqrt(mse)
+    mae = metrics.mean_absolute_error(predictions, gold_labels)
+    mse = mse
+
+    # create the results to return
+    for measure, measure_name in [[rmse, 'RMSE'], [mae, 'MAE'], [mse, 'MSE']]:
+        results_dict[f'{measure_name}'] = round(measure * 100, 2)
 
     return results_dict

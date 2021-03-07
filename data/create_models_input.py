@@ -41,7 +41,8 @@ alpha_global = 0.8
 global_prefix = 'raisha'
 global_suffix = 'saifa'
 crf_label_col_name = 'labels'
-prefix_history_col_name = 'history'
+prefix_history_text_col_name = 'history_text'
+prefix_history_behave_col_name = 'history_behave'
 prefix_future_col_name = 'future'
 prefix_suffix_col_name = 'suffix'
 curr_round_col_name = 'curr_round_feature'
@@ -110,7 +111,7 @@ def create_average_history_text(rounds: list, temp_reviews: pd.DataFrame):
         suffix_reviews = pd.concat([suffix_reviews, suffix_mean], axis=1, ignore_index=True, sort=False)
 
     history_reviews = history_reviews.T
-    history_reviews = rename_review_features_column(history_reviews, f'{prefix_history_col_name}_avg_feature')
+    history_reviews = rename_review_features_column(history_reviews, f'{prefix_history_text_col_name}_avg_feature')
     future_reviews = future_reviews.T
     future_reviews = rename_review_features_column(future_reviews, f'{prefix_future_col_name}_avg_feature')
     suffix_reviews = suffix_reviews.T
@@ -181,25 +182,36 @@ def flat_reviews_numbers(data: pd.DataFrame, rounds: list, columns_to_drop: list
     return all_history
 
 
-def split_pairs_to_data_sets(load_file_name: str, k_folds: int=6, only_train_val: bool=False):
+def split_pairs_to_data_sets(load_file_name: str, k_folds: int=6, only_train_val: bool=False, id_column: str='pair_id',
+                             directory: str=data_directory):
     """
     Split all the pairs to data sets: train, validation, test for 6 folds
     :param load_file_name: the raw data file name
     :param k_folds: number of folds to split the data
-    :param only_train_val: if we wanto to split datato only train and validation, without test data
+    :param only_train_val: if we want to split data to only train and validation, without test data
     (if test data is in a seperate data set)
+    :param id_column: the name of the ID column
+    :param directory: the directory the data is saved in
     :return:
     """
-    print(f'Start create and save data for file: {os.path.join(data_directory, f"{load_file_name}.csv")}')
-    data = pd.read_csv(os.path.join(data_directory, f'{load_file_name}.csv'))
-    data = data.loc[(data.status == 'play') & (data.player_id_in_group == 2)]
+    print(f'Start create and save data for file: {os.path.join(directory, f"{load_file_name}")}')
+    if 'csv' in load_file_name:
+        data = pd.read_csv(os.path.join(directory, f'{load_file_name}'))
+    elif 'pkl' in load_file_name:
+        data = joblib.load(os.path.join(directory, f'{load_file_name}'))
+    else:
+        raise NameError('file type must be csv or pkl')
+    if 'status' in data.columns:
+        data = data.loc[(data.status == 'play') & (data.player_id_in_group == 2)]
     data = data.drop_duplicates()
-    pairs = pd.DataFrame(data.pair_id.unique(), columns=['pair_id'])
+    if len(data.columns.names) == 2:
+        data.columns = data.columns.droplevel()
+    pairs = pd.DataFrame(data[id_column].unique(), columns=[id_column])
     pairs = pairs.sample(frac=1)
     pairs = pairs.assign(fold_number=0)
-    paris_list = pairs.pair_id.unique()
+    paris_list = pairs[id_column].unique()
     for k in range(k_folds):
-        pairs.loc[pairs.pair_id.isin([x for i, x in enumerate(paris_list) if i % k_folds == k]), 'fold_number'] = k
+        pairs.loc[pairs[id_column].isin([x for i, x in enumerate(paris_list) if i % k_folds == k]), 'fold_number'] = k
 
     # split pairs to folds - train, test, validation in each fold
     for k in range(k_folds):
@@ -252,7 +264,8 @@ class CreateSaveData:
         :param no_decision_features: if we want to check models without decision features
         :param suffix_no_current_round_average_text: if we want the average of all suffix text
         """
-        print(f'Start create and save data for file: {os.path.join(data_directory, f"{load_file_name}_{data_type}.csv")}')
+        print(f'Start create and save data for file: '
+              f'{os.path.join(data_directory, f"{load_file_name}_{data_type}.csv")}')
         logging.info('Start create and save data for file: {}'.
                      format(os.path.join(data_directory, f'{load_file_name}_{data_type}.csv')))
 
@@ -330,6 +343,7 @@ class CreateSaveData:
         self.pairs = pd.Series(self.data.pair_id.unique())
         self.total_payoff_label = total_payoff_label
         self.label = label
+        self.data_type = data_type
         self.number_of_rounds = 10
         self.features_file_list = features_file_list
         self.use_all_history = use_all_history
@@ -401,21 +415,15 @@ class CreateSaveData:
                     else:
                         j = 1
                     if alpha_global == 0:  # if alpha == 0: use average
-                        history_data_dict[pair][f'history_{column}'] = round(history[column].mean(), 2)
-                        # data_to_create.loc[(data_to_create.pair_id == pair) &
-                        #                    (data_to_create.subsession_round_number == round_num),
-                        #                    f'history_{column}'] = round(history[column].mean(), 2)
+                        history_data_dict[pair][f'{prefix_history_behave_col_name}_{column}'] =\
+                            round(history[column].mean(), 2)
                     else:
-                        history_data_dict[pair][f'history_{column}'] =\
+                        history_data_dict[pair][f'{prefix_history_behave_col_name}_{column}'] =\
                             (pow(history[column], j) * weights).mean()
-                        # data_to_create.loc[(data_to_create.pair_id == pair) &
-                        #                    (data_to_create.subsession_round_number == round_num),
-                        #                    f'history_{column}'] = (pow(history[column], j) * weights).mean()
+
                     # for the first round put -1 for the history
                     if round_num == 1:
-                        history_data_dict[pair][f'history_{column}'] = -1
-                    # data_to_create.loc[(data_to_create.pair_id == pair) &
-                    #                    (data_to_create.subsession_round_number == 1), f'history_{column}'] = -1
+                        history_data_dict[pair][f'{prefix_history_behave_col_name}_{column}'] = -1
                 pair_history_data = pd.DataFrame.from_dict(history_data_dict).T
                 history_data = history_data.append(pair_history_data)
 
@@ -449,6 +457,43 @@ class CreateSaveData:
             data = data.merge(suffix_reviews, on='review_id', how='left')
 
         return data
+
+    def create_features_per_review(self):
+        """
+        This function create for each review:
+        1. label: proportion of DMs choose hotel when read this review
+        2. HC features
+        :return:
+        """
+        print(f'Start creating information for each review')
+        logging.info('Start creating information for each review')
+
+        meta_data_columns = ['review_id', 'group_sender_answer_reviews']
+        data_per_review = self.data.groupby(by=['review_id']). \
+            agg(review=pd.NamedAgg(column='group_sender_answer_reviews', aggfunc=sum),
+                label=pd.NamedAgg(column='exp_payoff', aggfunc='mean'))
+        data_per_review.rename(columns={'label': self.label}, inplace=True)
+        self.final_data = data_per_review.merge(self.reviews_features, on='review_id')
+        feature_columns = self.reviews_features.columns.tolist()
+        feature_columns.remove('review_id')
+        self.final_data.review_id = self.final_data.review_id.map(str)
+        self.final_data.review_id =\
+            self.final_data.review_id.str.cat([self.data_type]*len(self.final_data.review_id), sep='_')
+        multi_level_column_names = list()
+        multi_level_column_names.extend([('meta_data', column) for column in meta_data_columns])
+        multi_level_column_names.append(('label', self.label))
+        multi_level_column_names.extend([('text_features', column) for column in feature_columns])
+        self.final_data.columns = pd.MultiIndex.from_tuples(multi_level_column_names, names=('high', 'low'))
+
+        # save final data
+        file_name = f'all_data_{self.base_file_name}'
+        self.final_data.to_csv(os.path.join(save_data_directory, f'{file_name}.csv'), index=False)
+        joblib.dump(self.final_data, os.path.join(save_data_directory, f'{file_name}.pkl'))
+
+        print(f'Finish creating manual features data: {file_name}.pkl')
+        logging.info('Finish creating manual features data')
+
+        return
 
     def create_info_df_per_pair_round(self):
         """
@@ -559,15 +604,18 @@ class CreateSaveData:
             self.final_data = self.final_data[columns_order]
 
         # create multi level columns to make it easier to use the df later
-        history_features = [column for column in self.final_data.columns if prefix_history_col_name in column]
+        history_behave_features =\
+            [column for column in self.final_data.columns if prefix_history_behave_col_name in column]
+        history_text_features = [column for column in self.final_data.columns if prefix_history_text_col_name in column]
         current_round_text_features = [column for column in self.final_data.columns if curr_round_col_name in column]
-        final_data_columns = meta_data_columns + history_features + current_round_text_features +\
-                             ['group_sender_answer_reviews', self.label]
+        final_data_columns = meta_data_columns + history_behave_features + history_text_features + \
+                             current_round_text_features + ['group_sender_answer_reviews', self.label]
         self.final_data = self.final_data[final_data_columns]
         # create tuples for multi level columns
         multi_level_column_names = list()
         multi_level_column_names.extend([('meta_data', column) for column in meta_data_columns])
-        multi_level_column_names.extend([('history_features', column) for column in history_features])
+        multi_level_column_names.extend([('history_behave_features', column) for column in history_behave_features])
+        multi_level_column_names.extend([('history_text_features', column) for column in history_text_features])
         multi_level_column_names.extend([('current_text_features', column) for column in current_round_text_features])
         multi_level_column_names.append(('plain_text', 'group_sender_answer_reviews'))
         multi_level_column_names.append(('label', self.label))
@@ -635,9 +683,9 @@ def main():
     features_to_use = ['hand_crafted_features']
     conditions_dict = {
         'verbal': {
-                   'use_all_history_average': True,  # use all the average of the all the prefix trials
+                   'use_all_history_average': False,  # use all the average of the all the prefix trials
                    'use_all_history': False,  # use all the behavioral features of the all the prefix trials
-                   'use_all_history_text_average': True,  # use all the average of the all the prefix trials texr
+                   'use_all_history_text_average': False,  # use all the average of the all the prefix trials texr
                    'use_all_history_text': False,  # use all the text of the all the prefix trials
                    'suffix_average_text': False,  # use the suffix trials average textual features
                    'no_suffix_text': False,  # don't use the suffix text
@@ -646,11 +694,12 @@ def main():
                    'transformer_model': False,   # for transformer models
                    'prefix_data_in_sequence': False,  # if the prefix data is not in the suffix features but in the seq
                    'suffix_no_current_round_average_text': False,  # use the average text of all suffix trials in SVM-CR
-                   'label': 'single_round',  # single_round for DNN models, future_total_payoff for SVM-CR model
+                   'label': 'proportion',  # single_round, future_total_payoff, proportion for review's label
+                   'per_review_proportion': True,
                    }
     }
     use_prefix_suffix_setting = False  # relevant to all sequential models in the prefix_suffix setting
-    data_type = 'test_data'  # it can be train_data or test_data
+    data_type = ['train_data', 'test_data']  # it can be train_data or test_data
     total_payoff_label = False if conditions_dict[condition]['label'] == 'single_round' else True
     features_to_drop = []  # if we don't want to use some of the features
     only_split_data = False  # if we just want to split data into folds and not create data
@@ -659,27 +708,40 @@ def main():
         pairs_folds.to_csv(os.path.join(save_data_directory, 'pairs_folds_new_test_data.csv'))
         return
 
-    create_save_data_obj = CreateSaveData('raw', total_payoff_label=total_payoff_label,
-                                          label=conditions_dict[condition]['label'], features_files_dict=features_files,
-                                          features_file_list=features_to_use,
-                                          use_prefix_suffix_setting=use_prefix_suffix_setting,
-                                          use_all_history=conditions_dict[condition]['use_all_history'],
-                                          use_all_history_average=conditions_dict[condition]['use_all_history_average'],
-                                          use_all_history_text_average=conditions_dict[condition]
-                                          ['use_all_history_text_average'],
-                                          use_all_history_text=conditions_dict[condition]['use_all_history_text'],
-                                          features_to_drop=features_to_drop,
-                                          suffix_average_text=conditions_dict[condition]['suffix_average_text'],
-                                          no_suffix_text=conditions_dict[condition]['no_suffix_text'],
-                                          non_nn_turn_model=conditions_dict[condition]['non_nn_turn_model'],
-                                          transformer_model=conditions_dict[condition]['transformer_model'],
-                                          prefix_data_in_sequence=conditions_dict[condition]['prefix_data_in_sequence'],
-                                          data_type=data_type,
-                                          no_decision_features=conditions_dict[condition]['no_decision_features'],
-                                          suffix_no_current_round_average_text=conditions_dict[condition][
-                                              'suffix_no_current_round_average_text'])
+    all_data = pd.DataFrame()
+    for dtype in data_type:
+        create_save_data_obj = CreateSaveData(
+            'raw', total_payoff_label=total_payoff_label,
+            label=conditions_dict[condition]['label'], features_files_dict=features_files,
+            features_file_list=features_to_use,
+            use_prefix_suffix_setting=use_prefix_suffix_setting,
+            use_all_history=conditions_dict[condition]['use_all_history'],
+            use_all_history_average=conditions_dict[condition]['use_all_history_average'],
+            use_all_history_text_average=conditions_dict[condition]['use_all_history_text_average'],
+            use_all_history_text=conditions_dict[condition]['use_all_history_text'],
+            features_to_drop=features_to_drop,
+            suffix_average_text=conditions_dict[condition]['suffix_average_text'],
+            no_suffix_text=conditions_dict[condition]['no_suffix_text'],
+            non_nn_turn_model=conditions_dict[condition]['non_nn_turn_model'],
+            transformer_model=conditions_dict[condition]['transformer_model'],
+            prefix_data_in_sequence=conditions_dict[condition]['prefix_data_in_sequence'],
+            data_type=dtype,
+            no_decision_features=conditions_dict[condition]['no_decision_features'],
+            suffix_no_current_round_average_text=conditions_dict[condition]['suffix_no_current_round_average_text'])
 
-    create_save_data_obj.create_info_df_per_pair_round()  # SVM-TR, MED, AVG
+        if conditions_dict[condition]['per_review_proportion']:
+            create_save_data_obj.create_features_per_review()
+            all_data = all_data.append(create_save_data_obj.final_data)
+        else:
+            create_save_data_obj.create_info_df_per_pair_round()  # SVM-TR, MED, AVG
+
+    if conditions_dict[condition]['per_review_proportion']:
+        file_name = f'all_data_{create_save_data_obj.base_file_name}'
+        all_data.to_csv(os.path.join(save_data_directory, f'{file_name}.csv'), index=False)
+        joblib.dump(all_data, os.path.join(save_data_directory, f'{file_name}.pkl'))
+        pairs_folds = split_pairs_to_data_sets(load_file_name=f'{file_name}.pkl', directory=save_data_directory,
+                                               id_column='review_id')
+        pairs_folds.to_csv(os.path.join(save_data_directory, 'reviews_folds.csv'))
 
 
 if __name__ == '__main__':

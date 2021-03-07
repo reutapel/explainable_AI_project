@@ -1,16 +1,30 @@
-from xgboost.sklearn import XGBClassifier
-from sklearn.ensemble import RandomForestClassifier
+from xgboost.sklearn import XGBClassifier, XGBRFRegressor
+import sklearn
+import xgboost.sklearn
+import catboost
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 # from lightgbm.sklearn import LGBMClassifier
-from catboost import CatBoostClassifier
+from catboost import CatBoostClassifier, CatBoostRegressor
+from sklearn.dummy import DummyClassifier, DummyRegressor
+from sklearn.svm import SVC, SVR
 import pandas as pd
 import logging
 import utils
 import os
 
+models = {'regression': {'svm': 'SVR',
+                         'randomforest': 'RandomForestRegressor',
+                         'xgboost': 'XGBRFRegressor',
+                         'catboost': 'CatBoostRegressor'},
+          'classification': {'svm': 'SVC',
+                             'randomforest': 'RandomForestClassifier',
+                             'xgboost': 'XGBClassifier',
+                             'catboost': 'CatBoostClassifier'}}
+
 
 class PredictiveModel:
     def __init__(self, features, model_name, hyper_parameters: dict, model_num: int, fold: int, fold_dir: str,
-                 excel_models_results: pd.ExcelWriter, trained_model=None):
+                 excel_models_results: pd.ExcelWriter, trained_model=None, model_type: str='regression'):
         self.features = features
         self.model_name = model_name
         self.model_num = model_num
@@ -23,18 +37,28 @@ class PredictiveModel:
             self.model = trained_model
 
         else:
-            if 'randomforest' in str.lower(model_name):
-                self.model = RandomForestClassifier(n_estimators=hyper_parameters['n_estimators'],
-                                                    max_depth=hyper_parameters['max_depth'],
-                                                    min_samples_split=hyper_parameters['min_samples_split'],
-                                                    min_samples_leaf=hyper_parameters['min_samples_leaf'])
+            if 'svm' in str.lower(model_name):
+                self.model = getattr(sklearn.svm, models[model_type]['svm'])(
+                    kernel=hyper_parameters['kernel'], degree=hyper_parameters['degree'])
+            elif 'mean' in str.lower(model_name):
+                self.model = DummyRegressor(strategy='mean')
+            elif 'median' in str.lower(model_name):
+                self.model = DummyRegressor(strategy='median')
+            elif 'randomforest' in str.lower(model_name):
+                self.model = getattr(sklearn.ensemble, models[model_type]['randomforest'])(
+                    n_estimators=hyper_parameters['n_estimators'],
+                    max_depth=hyper_parameters['max_depth'],
+                    min_samples_split=hyper_parameters['min_samples_split'],
+                    min_samples_leaf=hyper_parameters['min_samples_leaf'])
             elif 'xgboost' in str.lower(model_name):
-                self.model = XGBClassifier(learning_rate=hyper_parameters['learning_rate'],
-                                           n_estimators=hyper_parameters['n_estimators'],
-                                           max_depth=hyper_parameters['max_depth'],
-                                           min_child_weight=hyper_parameters['min_child_weight'],
-                                           gamma=hyper_parameters['gamma'],
-                                           subsample=hyper_parameters['subsample'])
+                self.model = getattr(xgboost, models[model_type]['xgboost'])(
+                    learning_rate=hyper_parameters['learning_rate'],
+                    n_estimators=hyper_parameters['n_estimators'],
+                    max_depth=hyper_parameters['max_depth'],
+                    min_child_weight=hyper_parameters['min_child_weight'],
+                    gamma=hyper_parameters['gamma'],
+                    subsample=hyper_parameters['subsample'],
+                    objective='reg:squarederror',)
             # elif 'lightgbm' in str.lower(model_name):
             #     self.model = LGBMClassifier(num_leaves=hyper_parameters['num_leaves'],
             #                                 max_depth=hyper_parameters['num_leaves'],
@@ -45,7 +69,7 @@ class PredictiveModel:
             #                                 reg_alpha=hyper_parameters['reg_alpha'],
             #                                 reg_lambda=hyper_parameters['reg_lambda'])
             elif 'catboost' in str.lower(model_name):
-                self.model = CatBoostClassifier(
+                self.model = getattr(catboost, models[model_type]['catboost'])(
                     iterations=hyper_parameters['iterations'],
                     depth=hyper_parameters['depth'],
                     learning_rate=hyper_parameters['learning_rate'],
