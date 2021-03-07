@@ -11,8 +11,8 @@ import pandas as pd
 import numpy as np
 import json
 import collections
-from CausaLM.constants import BERT_PRETRAINED_MODEL, SENTIMENT_TOPICS_PRETRAIN_DATA_DIR, MAX_SENTIMENT_SEQ_LENGTH, \
-    SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, SENTIMENT_DOMAINS
+from CausaLM.constants import BERT_PRETRAINED_MODEL, REVIEWS_FEATURES_PRETRAIN_DATA_DIR, MAX_SENTIMENT_SEQ_LENGTH, \
+    REVIEWS_FEATURES_DATASETS_DIR, REVIEWS_FEATURES_DOMAIN_TREAT_CONTROL_MAP_FILE, SENTIMENT_DOMAINS
 
 
 from CausaLM.datasets.utils import WORDPIECE_PREFIX, MASK_TOKEN, CLS_TOKEN, SEP_TOKEN
@@ -280,7 +280,6 @@ def create_training_file(docs, vocab_list, args, epoch_num, output_dir):
         metrics_file.write(json.dumps(metrics))
 
 
-
 def main():
     parser = ArgumentParser()
     parser.add_argument('--train_corpus', type=Path, required=False)
@@ -315,10 +314,11 @@ def main():
 
 
 def generate_data_for_domain(args, domain):
-    tokenizer = BertTokenizer.from_pretrained(BERT_PRETRAINED_MODEL, do_lower_case=bool(BERT_PRETRAINED_MODEL.endswith("uncased")))
+    tokenizer = BertTokenizer.from_pretrained(BERT_PRETRAINED_MODEL,
+                                              do_lower_case=bool(BERT_PRETRAINED_MODEL.endswith("uncased")))
     vocab_list = list(tokenizer.vocab.keys())
 
-    with open(SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
+    with open(REVIEWS_FEATURES_DOMAIN_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
         domain_topic_treat_dict = json.load(jsonfile)
 
     treatment_topic = domain_topic_treat_dict[domain]["treated_topic"]
@@ -329,11 +329,11 @@ def generate_data_for_domain(args, domain):
 
     with DocumentDatabase(reduce_memory=args.reduce_memory) as docs:
         print(f"\nGenerating data for domain: {domain}")
-        output_dir = Path(SENTIMENT_TOPICS_PRETRAIN_DATA_DIR) / domain
+        output_dir = Path(REVIEWS_FEATURES_PRETRAIN_DATA_DIR) / domain
         output_dir.mkdir(exist_ok=True, parents=True)
         unique_ids, reviews, treatment_labels, control_labels = list(), list(), list(), list()
         for dataset in ("train", "dev"):
-            DATASET_FILE = f"{SENTIMENT_TOPICS_DATASETS_DIR}/topics_{dataset}.csv"
+            DATASET_FILE = f"{REVIEWS_FEATURES_DATASETS_DIR}/topics_{dataset}.csv"
             df = pd.read_csv(DATASET_FILE, header=0, encoding='utf-8', usecols=["id", "review", treatment_column, control_column]).set_index(keys="id", drop=False).sort_index()
             df = df[df[treatment_column].notnull()]
             unique_ids += df["id"].astype(int).tolist()
