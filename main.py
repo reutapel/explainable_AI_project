@@ -399,7 +399,6 @@ if __name__ == '__main__':
                               data_file_name=outer_data_file_name, test_data_file_name=outer_test_data_file_name)
 
     #todo: add shap here
-
         for model in best_models_paths_dict.keys():
             print(f'computing SHAP values of {model}')
             pkl_model_path = Path(best_models_paths_dict[model])
