@@ -97,7 +97,11 @@ def execute_create_fit_predict_eval_model(model_num, features, train_x, train_y,
 
     utils.write_to_excel(model_class.model_table_writer, 'Model results', ['Model results'], results_df)
     model_class.model_table_writer.save()
-    joblib.dump(results_df, model_num_results_path)
+
+    model_num_results = joblib.load(model_num_results_path)
+    results_for_model_num_results = results_df.copy(True)
+    model_num_results = pd.concat([model_num_results, results_for_model_num_results], sort='False')
+    joblib.dump(model_num_results, model_num_results_path)
     del model_class
 
     return all_models_results
