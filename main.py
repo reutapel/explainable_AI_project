@@ -37,6 +37,11 @@ default_gridsearch_params = {
     'lightGBM': {'num_leaves': 31, 'max_depth': -1, 'learning_rate': 0.1, 'n_estimators': 100, 'subsample_for_bin': 50,
                  'min_child_samples': 20, 'reg_alpha': 0., 'reg_lambda': 0.},
     'CatBoost': {'iterations': 500, 'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 3.0},
+    'SVM': {'kernel': 'rbf', 'degree': 3},
+    'most_frequent': {},
+    'mean': {},
+    'median': {}
+
 }
 
 gridsearch_params = {
@@ -99,7 +104,11 @@ def execute_create_fit_predict_eval_model(model_num, features, train_x, train_y,
 
     utils.write_to_excel(model_class.model_table_writer, 'Model results', ['Model results'], results_df)
     model_class.model_table_writer.save()
-    joblib.dump(results_df, model_num_results_path)
+
+    model_num_results = joblib.load(model_num_results_path)
+    results_for_model_num_results = results_df.copy(True)
+    model_num_results = pd.concat([model_num_results, results_for_model_num_results], sort='False')
+    joblib.dump(model_num_results, model_num_results_path)
     del model_class
 
     return all_models_results
@@ -173,7 +182,6 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                                            features_families=features_families, test_pair_ids=test_pair_ids)
 
     model_names = ['SVM', 'mean', 'median', 'RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
-    # model_names = ['RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
 
     for model_num, model_name in enumerate(model_names):
         model_num_results_path = os.path.join(excel_models_results, f'model_name_results_{model_name}.pkl')
@@ -345,7 +353,7 @@ def not_parallel_main(data_file_name: str, test_data_file_name: str, features_fa
     for fold in range(num_folds):
         _, models_paths_dict =\
             execute_fold_parallel(participants_fold_split[f'fold_{fold}'], fold=fold, cuda_device='1',
-                                  hyper_parameters_tune_mode=True, data_file_name=data_file_name,
+                                  hyper_parameters_tune_mode=False, data_file_name=data_file_name,
                                   test_data_file_name=test_data_file_name, features_families=features_families,
                                   id_column=id_column, model_type=model_type)
 
