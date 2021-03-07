@@ -13,15 +13,15 @@ from torch.utils.data import DataLoader, Dataset, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 
-from transformers.tokenization_bert import BertTokenizer
+from transformers.models.bert.tokenization_bert import BertTokenizer
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
-from Sentiment_Topics.lm_finetune.pregenerate_training_data import EPOCHS
-from Sentiment_Topics.lm_finetune.bert_topics_finetune import BertForTopicTreatControlPreTraining, \
+from CausaLM.Reviews_Features.lm_finetune.pregenerate_training_data import EPOCHS
+from CausaLM.Reviews_Features.lm_finetune.bert_topics_finetune import BertForTopicTreatControlPreTraining, \
     BertForTopicTreatPreTraining
-from BERT.bert_text_dataset import BertTextDataset
-from utils import init_logger
+from CausaLM.BERT.bert_text_dataset import BertTextDataset
+from CausaLM.utils import init_logger
 
-from constants import RANDOM_SEED, SENTIMENT_TOPICS_PRETRAIN_DIR, BERT_PRETRAINED_MODEL, NUM_CPU, \
+from CausaLM.constants import RANDOM_SEED, SENTIMENT_TOPICS_PRETRAIN_DIR, BERT_PRETRAINED_MODEL, NUM_CPU, \
     SENTIMENT_TOPICS_PRETRAIN_DATA_DIR, SENTIMENT_TOPICS_PRETRAIN_IXT_DIR, SENTIMENT_DOMAINS
 
 BATCH_SIZE = 6

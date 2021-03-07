@@ -1,16 +1,16 @@
 import json
 
-from constants import SENTIMENT_EXPERIMENTS_DIR, MAX_SENTIMENT_SEQ_LENGTH, SENTIMENT_DOMAINS, \
+from CausaLM.constants import SENTIMENT_EXPERIMENTS_DIR, MAX_SENTIMENT_SEQ_LENGTH, SENTIMENT_DOMAINS, \
     SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_TOPICS_PRETRAIN_IXT_DIR
 from pytorch_lightning import Trainer
-from BERT.bert_text_classifier import LightningBertPretrainedClassifier, LightningHyperparameters
-from Sentiment_Topics.pipeline.predict import print_final_metrics, predict_models
+from CausaLM.BERT.bert_text_classifier import LightningBertPretrainedClassifier, LightningHyperparameters
+from CausaLM.Reviews_Features.pipeline.predict import print_final_metrics, predict_models
 
 from argparse import ArgumentParser
 from typing import Dict
 import torch
 
-from utils import init_logger
+from CausaLM.utils import init_logger
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ### Constants

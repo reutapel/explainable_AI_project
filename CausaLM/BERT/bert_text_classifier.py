@@ -2,12 +2,12 @@ from typing import Callable, List
 from tqdm import tqdm
 from transformers import BertModel
 from torch.utils.data.dataloader import DataLoader
-from datasets.utils import CLS_TOKEN, SEP_TOKEN
-from constants import NUM_CPU, MAX_SENTIMENT_SEQ_LENGTH
-from BERT.bert_text_dataset import BERT_PRETRAINED_MODEL, BertTextDataset, InputExample, InputLabel, InputFeatures, \
-    truncate_seq_first
+from CausaLM.datasets.utils import CLS_TOKEN, SEP_TOKEN
+from CausaLM.constants import NUM_CPU, MAX_SENTIMENT_SEQ_LENGTH
+from CausaLM.BERT.bert_text_dataset import BERT_PRETRAINED_MODEL, BertTextDataset, InputExample, InputLabel,\
+    InputFeatures, truncate_seq_first
 from pytorch_lightning import LightningModule, data_loader
-from utils import save_predictions
+from CausaLM.utils import save_predictions
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
