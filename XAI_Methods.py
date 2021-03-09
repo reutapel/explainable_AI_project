@@ -19,22 +19,33 @@ import os
 
 
 class XAIMethods:
-    def __init__(self, model, X, method_name: str):
+    def __init__(self, model, X_test, X_train, XAI_method_name: str, model_type: str):
         self.model = model
-        self.X = X
+        self.X_test = X_test
+        self.X_train = X_train
+
         # self.y = y
-        self.method_name = method_name
+        self.XAI_method_name = XAI_method_name
+        self.model_type = model_type
 
-        #todo: for now support tree models only, should add if else for different
-        if 'shap' in str.lower(method_name):
+        #todo: for now support tree models only, should add if else for different models
+        if 'shap' in str.lower(self.XAI_method_name):
             # explain the model's predictions using SHAP
-            # (same syntax works for LightGBM, CatBoost, scikit-learn and spark models)
-            self.explainer = shap.TreeExplainer(model)
 
-            self.shap_values = self.explainer.shap_values(X)
+            #todo: i need to debug this part
+            if 'svm' == str.lower(self.model_type):
+                self.explainer = shap.KernelExplainer(self.model.predict_proba, self.X_train, link="logit")
+                self.shap_values = self.explainer.shap_values(X_test, nsamples=100)
+
+            elif str.lower(self.model_type) in ['randomforest', 'xgboost', 'catboost']:
+                # (same syntax works for LightGBM, CatBoost, scikit-learn and spark models)
+                if str.lower(self.model_type) == 'catboost':
+                    X_test.columns = [' '.join(col).strip() for col in X_test.columns.values]
+                self.explainer = shap.TreeExplainer(model)
+                self.shap_values = self.explainer.shap_values(X_test)
 
         #todo: this library needs to be debugged - does not work as expected
-        elif 'sage' in str.lower(method_name):
+        elif 'sage' in str.lower(XAI_method_name):
             print()
 
         else:
@@ -50,15 +61,15 @@ class XAIMethods:
         # vals = np.abs(self.shap_values[0]).mean(0)
         vals = np.abs(self.shap_values).mean(0)
 
-        feature_importance = pd.DataFrame(list(zip(self.X.columns, vals)), columns=['col_name', 'feature_importance_vals'])
+        feature_importance = pd.DataFrame(list(zip(self.X_test.columns, vals)), columns=['col_name', 'feature_importance_vals'])
         feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
         return feature_importance
 
     def visualize_shap(self):
         # visualize the first prediction's explanation (use matplotlib=True to avoid Javascript)
         # shap.force_plot(self.explainer.expected_value, self.shap_values[0, :], self.X.iloc[0, :])
-        shap.summary_plot(self.shap_values, self.X)
-        shap.summary_plot(self.shap_values, self.X, plot_type="bar")
+        shap.summary_plot(self.shap_values, self.X_test)
+        shap.summary_plot(self.shap_values, self.X_test, plot_type="bar")
 
 
 if __name__ == '__main__':
