@@ -64,15 +64,15 @@ class LightningBertPOSTagger(LightningModule):
         if parameters_list:
             return torch.optim.Adam(parameters_list)
         else:
-            return [] # PyTorch Lightning hack for test mode with frozen model
+            return []  # PyTorch Lightning hack for test mode with frozen model
 
     @data_loader
     def train_dataloader(self):
         if not self.training:
-            return [] # PyTorch Lightning hack for test mode with frozen model
+            return []  # PyTorch Lightning hack for test mode with frozen model
         dataset = BertTokenClassificationDataset(self.hparams.data_path, self.hparams.treatment, "train",
-                                                self.hparams.text_column, self.hparams.label_column,
-                                                max_seq_length=self.hparams.max_seq_len)
+                                                 self.hparams.text_column, self.hparams.label_column,
+                                                 max_seq_length=self.hparams.max_seq_len)
         dataloader = DataLoader(dataset, batch_size=self.hparams.batch_size, shuffle=True, num_workers=NUM_CPU)
         return dataloader
 
@@ -93,8 +93,8 @@ class LightningBertPOSTagger(LightningModule):
         if not self.training:
             return [] # PyTorch Lightning hack for test mode with frozen model
         dataset = BertTokenClassificationDataset(self.hparams.data_path, self.hparams.treatment, "dev",
-                                                self.hparams.text_column, self.hparams.label_column,
-                                                max_seq_length=self.hparams.max_seq_len)
+                                                 self.hparams.text_column, self.hparams.label_column,
+                                                 max_seq_length=self.hparams.max_seq_len)
         dataloader = DataLoader(dataset, batch_size=self.hparams.batch_size, shuffle=True, num_workers=NUM_CPU)
         return dataloader
 
@@ -122,8 +122,8 @@ class LightningBertPOSTagger(LightningModule):
     @data_loader
     def test_dataloader(self):
         dataset = BertTokenClassificationDataset(self.hparams.data_path, self.hparams.treatment, "test",
-                                                self.hparams.text_column, self.hparams.label_column,
-                                                max_seq_length=self.hparams.max_seq_len)
+                                                 self.hparams.text_column, self.hparams.label_column,
+                                                 max_seq_length=self.hparams.max_seq_len)
         dataloader = DataLoader(dataset, batch_size=self.hparams.batch_size, shuffle=True, num_workers=NUM_CPU)
         return dataloader
 
