@@ -15,12 +15,12 @@ from tqdm import tqdm
 
 from transformers.tokenization_bert import BertTokenizer
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
-from BERT.lm_finetune.bert_mlm_finetune import BertForMLMPreTraining
-from Sentiment_Topics.lm_finetune.pregenerate_training_data import EPOCHS
-from BERT.bert_text_dataset import BertTextDataset
-from utils import init_logger
+from CausaLM.BERT.lm_finetune.bert_mlm_finetune import BertForMLMPreTraining
+from CausaLM.Sentiment_Topics.lm_finetune.pregenerate_training_data import EPOCHS
+from CausaLM.BERT.bert_text_dataset import BertTextDataset
+from CausaLM.utils import init_logger
 
-from constants import RANDOM_SEED, BERT_PRETRAINED_MODEL, NUM_CPU, \
+from CausaLM.constants import RANDOM_SEED, BERT_PRETRAINED_MODEL, NUM_CPU, \
     SENTIMENT_TOPICS_PRETRAIN_DATA_DIR, SENTIMENT_TOPICS_PRETRAIN_MLM_DIR, SENTIMENT_DOMAINS
 
 BATCH_SIZE = 10
