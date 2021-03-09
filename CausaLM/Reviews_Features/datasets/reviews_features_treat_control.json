@@ -1,0 +1,1 @@
+{"topic_price_positive": {"treated_feature": "topic_price_positive", "control_features": ["topic_facilities_positive"]}}

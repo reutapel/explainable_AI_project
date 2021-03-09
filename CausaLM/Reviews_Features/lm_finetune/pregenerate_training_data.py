@@ -6,18 +6,18 @@ import shelve
 from multiprocessing import Pool
 from typing import List, Collection
 from random import random, randrange, randint, choice
-from transformers.models.bert.tokenization_bert import BertTokenizer
+from transformers.tokenization_bert import BertTokenizer
 import pandas as pd
 import numpy as np
 import json
 import collections
 from CausaLM.constants import BERT_PRETRAINED_MODEL, REVIEWS_FEATURES_PRETRAIN_DATA_DIR, MAX_SENTIMENT_SEQ_LENGTH, \
-    REVIEWS_FEATURES_DATASETS_DIR, REVIEWS_FEATURES_DOMAIN_TREAT_CONTROL_MAP_FILE, SENTIMENT_DOMAINS
+    REVIEWS_FEATURES_DATASETS_DIR, REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, REVIEWS_FEATURES
 
 
 from CausaLM.datasets.utils import WORDPIECE_PREFIX, MASK_TOKEN, CLS_TOKEN, SEP_TOKEN
 
-EPOCHS = 5
+EPOCHS = 1
 MLM_PROB = 0.15
 MAX_PRED_PER_SEQ = 30
 
@@ -130,7 +130,6 @@ def truncate_seq(tokens, max_num_tokens):
         else:
             r -= 1
     return trunc_tokens[l:r]
-
 
 
 MaskedLmInstance = collections.namedtuple("MaskedLmInstance", ["index", "label"])
@@ -304,46 +303,52 @@ def main():
                         help="Probability of masking each token for the LM task")
     parser.add_argument("--max_predictions_per_seq", type=int, default=MAX_PRED_PER_SEQ,
                         help="Maximum number of tokens to mask in each sequence")
-    parser.add_argument("--domain", type=str, default="books", choices=SENTIMENT_DOMAINS)
+    parser.add_argument("--treated", type=str, default="topic_price_positive", choices=REVIEWS_FEATURES)
     args = parser.parse_args()
 
     if args.num_workers > 1 and args.reduce_memory:
         raise ValueError("Cannot use multiple workers while reducing memory")
 
-    generate_data_for_domain(args, args.domain)
+    generate_data_for_domain(args, args.treated)
 
 
-def generate_data_for_domain(args, domain):
+def generate_data_for_domain(args, treated):
     tokenizer = BertTokenizer.from_pretrained(BERT_PRETRAINED_MODEL,
                                               do_lower_case=bool(BERT_PRETRAINED_MODEL.endswith("uncased")))
     vocab_list = list(tokenizer.vocab.keys())
 
-    with open(REVIEWS_FEATURES_DOMAIN_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
-        domain_topic_treat_dict = json.load(jsonfile)
+    with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
+        reviews_features_treat_dict = json.load(jsonfile)
 
-    treatment_topic = domain_topic_treat_dict[domain]["treated_topic"]
-    control_topic = domain_topic_treat_dict[domain]["control_topics"][-1]
+    treatment_topic = reviews_features_treat_dict[treated]["treated_feature"]
+    control_topic = reviews_features_treat_dict[treated]["control_features"][-1]
 
-    treatment_column = f"{treatment_topic}_bin"
-    control_column = f"{control_topic}_bin"
+    treatment_column = f"{treatment_topic}"
+    control_column = f"{control_topic}"
+    id_column = 'review_id'
+    text_column = 'review'
 
     with DocumentDatabase(reduce_memory=args.reduce_memory) as docs:
-        print(f"\nGenerating data for domain: {domain}")
-        output_dir = Path(REVIEWS_FEATURES_PRETRAIN_DATA_DIR) / domain
+        print(f"\nGenerating data for treated feature: {treated}")
+        output_dir = Path(REVIEWS_FEATURES_PRETRAIN_DATA_DIR) / treated
         output_dir.mkdir(exist_ok=True, parents=True)
         unique_ids, reviews, treatment_labels, control_labels = list(), list(), list(), list()
         for dataset in ("train", "dev"):
-            DATASET_FILE = f"{REVIEWS_FEATURES_DATASETS_DIR}/topics_{dataset}.csv"
-            df = pd.read_csv(DATASET_FILE, header=0, encoding='utf-8', usecols=["id", "review", treatment_column, control_column]).set_index(keys="id", drop=False).sort_index()
+            DATASET_FILE = f"{REVIEWS_FEATURES_DATASETS_DIR}/reviews_features_{dataset}.csv"
+            df = pd.read_csv(DATASET_FILE, header=0, encoding='utf-8',
+                             usecols=[id_column, text_column, treatment_column, control_column]).\
+                set_index(keys=id_column, drop=False).sort_index()
             df = df[df[treatment_column].notnull()]
-            unique_ids += df["id"].astype(int).tolist()
-            reviews += df["review"].apply(tokenizer.tokenize).tolist()
+            unique_ids += df[id_column].astype(int).tolist()
+            reviews += df[text_column].apply(tokenizer.tokenize).tolist()
             treatment_labels += df[treatment_column].astype(int).tolist()
             control_labels += df[control_column].astype(int).tolist()
 
-        for unique_id, doc, treatment_label, control_label in tqdm(zip(unique_ids, reviews, treatment_labels, control_labels)):
+        for unique_id, doc, treatment_label, control_label in \
+                tqdm(zip(unique_ids, reviews, treatment_labels, control_labels)):
             if doc:
-                docs.add_document(unique_id, doc, treatment_label, control_label)  # If the last doc didn't end on a newline, make sure it still gets added
+                # If the last doc didn't end on a newline, make sure it still gets added
+                docs.add_document(unique_id, doc, treatment_label, control_label)
         if len(docs) <= 1:
             exit("ERROR: No document breaks were found in the input file! These are necessary to allow the script to "
                  "ensure that random NextSentences are not sampled from the same document. Please add blank lines to "
