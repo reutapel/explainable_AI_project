@@ -1,8 +1,8 @@
 import json
 from argparse import ArgumentParser
-from CausaLM.constants import SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_EXPERIMENTS_DIR, \
-    SENTIMENT_TOPICS_PRETRAIN_MLM_DIR, SENTIMENT_TOPICS_PRETRAIN_IXT_DIR, SENTIMENT_DOMAINS, \
-    SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE
+from CausaLM.constants import REVIEWS_FEATURES_DATASETS_DIR, REVIEWS_FEATURES_EXPERIMENTS_DIR, \
+    REVIEWS_FEATURES_PRETRAIN_MLM_DIR, REVIEWS_FEATURES_PRETRAIN_IXT_DIR, REVIEWS_FEATURES, \
+    REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, TASK
 from pytorch_lightning import Trainer, LightningModule
 from CausaLM.BERT.bert_text_classifier import LightningBertPretrainedClassifier, BertPretrainedClassifier
 from copy import deepcopy
@@ -12,7 +12,7 @@ import torch
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--domain", type=str, default="books", choices=SENTIMENT_DOMAINS),
+    parser.add_argument("--domain", type=str, default="books", choices=REVIEWS_FEATURES),
     parser.add_argument("--trained_group", type=str, required=False, default="F",
                         help="Specify data group for trained_models: F (factual) or CF (counterfactual)")
     parser.add_argument("--pretrained_epoch", type=int, required=False, default=0,
@@ -35,7 +35,8 @@ def bert_treatment_test(model_ckpt, hparams, trainer, logger=None):
     if hparams["bert_params"]["bert_state_dict"]:
         model.hparams.bert_params["bert_state_dict"] = hparams["bert_params"]["bert_state_dict"]
         model.bert_classifier.bert_state_dict = hparams["bert_params"]["bert_state_dict"]
-        logger.info(f"Loading pretrained BERT model for {hparams['bert_params']['name']} from: {model.bert_classifier.bert_state_dict}")
+        logger.info(f"Loading pretrained BERT model for {hparams['bert_params']['name']} from: "
+                    f"{model.bert_classifier.bert_state_dict}")
         model.bert_classifier.bert = BertPretrainedClassifier.load_frozen_bert(model.bert_classifier.bert_pretrained_model,
                                                                                model.bert_classifier.bert_state_dict)
 
@@ -59,9 +60,8 @@ def predict_models_unit(task, treatment, domain, trained_group, group, model_ckp
     if pretrained_epoch is not None:
         state_dict_dir = f"{state_dict_dir}/epoch_{pretrained_epoch}"
 
-
     label_size = 2
-    if task == "Sentiment":
+    if task == TASK:
         label_column = f"{task.lower()}_label"
     elif "ITT" in task:
         label_column = hparams['treatment_column']
@@ -80,7 +80,7 @@ def predict_models_unit(task, treatment, domain, trained_group, group, model_ckp
 
     if not model_ckpt:
         model_name = f"{task}_{hparams['trained_group']}"
-        models_dir = f"{SENTIMENT_EXPERIMENTS_DIR}/{hparams['treatment']}/{hparams['domain']}/{model_name}/lightning_logs/*"
+        models_dir = f"{REVIEWS_FEATURES_EXPERIMENTS_DIR}/{hparams['treatment']}/{hparams['domain']}/{model_name}/lightning_logs/*"
         model_ckpt = find_latest_model_checkpoint(models_dir)
 
     # Group Task BERT Model training
@@ -88,19 +88,21 @@ def predict_models_unit(task, treatment, domain, trained_group, group, model_ckp
     bert_treatment_test(model_ckpt, hparams, trainer, logger)
 
     # Group Task BERT Model test with MLM LM
-    hparams["bert_params"]["name"] = f"{task}_MLM_{group}_trained_{trained_group}"
-    hparams["bert_params"]["bert_state_dict"] = f"{SENTIMENT_TOPICS_PRETRAIN_MLM_DIR}/{domain}/model/epoch_{pretrained_epoch}/pytorch_model.bin"
-    logger.info(f"MLM Pretrained Model: {hparams['bert_params']['bert_state_dict']}")
-    bert_treatment_test(model_ckpt, hparams, trainer, logger)
+    # hparams["bert_params"]["name"] = f"{task}_MLM_{group}_trained_{trained_group}"
+    # hparams["bert_params"]["bert_state_dict"] = f"{REVIEWS_FEATURES_PRETRAIN_MLM_DIR}/{domain}/model/epoch_{pretrained_epoch}/pytorch_model.bin"
+    # logger.info(f"MLM Pretrained Model: {hparams['bert_params']['bert_state_dict']}")
+    # bert_treatment_test(model_ckpt, hparams, trainer, logger)
 
     if not bert_state_dict:
         # Group Task BERT Model test with treated LM
         if pretrained_control:
-            hparams["bert_params"]["name"] = f"{task}_topic_{hparams['treatment_column'].split('_')[1]}_treated_topic_{hparams['control_column'].split('_')[1]}_controlled_{group}_trained_{trained_group}"
+            hparams["bert_params"]["name"] =\
+                f"{task}_topic_{hparams['treatment_column'].split('_')[1]}_treated_topic_" \
+                f"{hparams['control_column'].split('_')[1]}_controlled_{group}_trained_{trained_group}"
         else:
-            hparams["bert_params"][
-                "name"] = f"{task}_topic_{hparams['treatment_column'].split('_')[1]}_treated_{group}_trained_{trained_group}"
-        hparams["bert_params"]["bert_state_dict"] = f"{SENTIMENT_TOPICS_PRETRAIN_IXT_DIR}/{state_dict_dir}/pytorch_model.bin"
+            hparams["bert_params"]["name"] =\
+                f"{task}_topic_{hparams['treatment_column'].split('_')[1]}_treated_{group}_trained_{trained_group}"
+        hparams["bert_params"]["bert_state_dict"] = f"{REVIEWS_FEATURES_PRETRAIN_IXT_DIR}/{state_dict_dir}/pytorch_model.bin"
         logger.info(f"Treated Pretrained Model: {hparams['bert_params']['bert_state_dict']}")
         bert_treatment_test(model_ckpt, hparams, trainer, logger)
 
@@ -108,31 +110,31 @@ def predict_models_unit(task, treatment, domain, trained_group, group, model_ckp
 def predict_models(treatment="topics", domain="books", trained_group="F", pretrained_epoch=None, pretrained_control=None,
                    sentiment_model_ckpt=None, itt_model_ckpt=None, itc_model_ckpt=None, bert_state_dict=None):
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    with open(SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
-        domain_topic_treat_dict = json.load(jsonfile)
-    treatment_topic = domain_topic_treat_dict[domain]["treated_topic"]
-    control_topic = domain_topic_treat_dict[domain]["control_topics"][-1]
+    with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
+        reviews_features_treat_dict = json.load(jsonfile)
+    treated_feature = reviews_features_treat_dict[domain]["treated_feature"]
+    control_features = reviews_features_treat_dict[domain]["control_features"][-1]
 
     hparams = {
         "treatment": treatment,
         "domain": domain,
         "trained_group": trained_group,
-        "treatment_column": f"{treatment_topic}_bin",
-        "control_column": f"{control_topic}_bin",
+        "treatment_column": f"{treated_feature}",
+        "control_column": f"{control_features}",
         "text_column": "review",
-        "data_path": SENTIMENT_TOPICS_DATASETS_DIR,
+        "data_path": REVIEWS_FEATURES_DATASETS_DIR,
         "bert_params": {
             "bert_state_dict": bert_state_dict
         }
     }
-    OUTPUT_DIR = f"{SENTIMENT_EXPERIMENTS_DIR}/{treatment}/{domain}/COMPARE"
+    OUTPUT_DIR = f"{REVIEWS_FEATURES_EXPERIMENTS_DIR}/{treatment}/{domain}/COMPARE"
     trainer = Trainer(gpus=1 if DEVICE.type == "cuda" else 0,
                       default_save_path=OUTPUT_DIR,
                       show_progress_bar=True,
                       early_stop_callback=None)
     hparams["output_path"] = trainer.logger.experiment.log_dir.rstrip('tf')
     logger = init_logger(f"testing", hparams["output_path"])
-    for task, model in zip(("Sentiment", "CONTROL_ITT", "CONTROL_ICT"),
+    for task, model in zip((TASK, "CONTROL_ITT", "CONTROL_ICT"),
                            (sentiment_model_ckpt, itt_model_ckpt, itc_model_ckpt)):
         for group in ("F",):
             predict_models_unit(task, treatment, domain, trained_group, group, model,
@@ -145,27 +147,28 @@ def predict_models(treatment="topics", domain="books", trained_group="F", pretra
 def predict_all_models(args, domain: str):
     treatment = "topics"
 
-    with open(SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
-        domain_topic_treat_dict = json.load(jsonfile)
+    with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
+        reviews_features_treat_dict = json.load(jsonfile)
 
-    treatment_topic = domain_topic_treat_dict[domain]["treated_topic"]
-    control_topic = domain_topic_treat_dict[domain]["control_topics"][-1]
+    treated_feature = reviews_features_treat_dict[domain]["treated_feature"]
+    control_features = reviews_features_treat_dict[domain]["control_features"][-1]
 
     predict_models(treatment, domain, args.trained_group, args.pretrained_epoch, args.pretrained_control)
 
     if args.pretrained_control:
-        pretrained_treated_model_dir = f"{SENTIMENT_TOPICS_PRETRAIN_IXT_DIR}/{domain}/model_control"
-        trained_group = f"{args.trained_group}_{treatment_topic}_treated_{control_topic}_controlled"
+        pretrained_treated_model_dir = f"{REVIEWS_FEATURES_PRETRAIN_IXT_DIR}/{domain}/model_control"
+        trained_group = f"{args.trained_group}_{treated_feature}_treated_{control_features}_controlled"
     else:
-        pretrained_treated_model_dir = f"{SENTIMENT_TOPICS_PRETRAIN_IXT_DIR}/{domain}/model"
-        trained_group = f"{args.trained_group}_{treatment_topic}_treated"
+        pretrained_treated_model_dir = f"{REVIEWS_FEATURES_PRETRAIN_IXT_DIR}/{domain}/model"
+        trained_group = f"{args.trained_group}_{treated_feature}_treated"
 
     if args.pretrained_epoch is not None:
         pretrained_treated_model_dir = f"{pretrained_treated_model_dir}/epoch_{args.pretrained_epoch}"
 
     bert_state_dict = f"{pretrained_treated_model_dir}/pytorch_model.bin"
 
-    predict_models(treatment, domain, trained_group, args.pretrained_epoch, args.pretrained_control, bert_state_dict=bert_state_dict)
+    predict_models(treatment, domain, trained_group, args.pretrained_epoch, args.pretrained_control,
+                   bert_state_dict=bert_state_dict)
 
 
 if __name__ == "__main__":

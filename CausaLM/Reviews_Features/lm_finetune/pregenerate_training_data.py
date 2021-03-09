@@ -320,11 +320,11 @@ def generate_data_for_domain(args, treated):
     with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
         reviews_features_treat_dict = json.load(jsonfile)
 
-    treatment_topic = reviews_features_treat_dict[treated]["treated_feature"]
-    control_topic = reviews_features_treat_dict[treated]["control_features"][-1]
+    treated_feature = reviews_features_treat_dict[treated]["treated_feature"]
+    control_features = reviews_features_treat_dict[treated]["control_features"][-1]
 
-    treatment_column = f"{treatment_topic}"
-    control_column = f"{control_topic}"
+    treatment_column = f"{treated_feature}"
+    control_column = f"{control_features}"
     id_column = 'review_id'
     text_column = 'review'
 
