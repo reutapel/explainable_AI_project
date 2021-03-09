@@ -107,17 +107,17 @@ def predict_models_unit(task, treatment, domain, trained_group, group, model_ckp
         bert_treatment_test(model_ckpt, hparams, trainer, logger)
 
 
-def predict_models(treatment="topics", domain="books", trained_group="F", pretrained_epoch=None, pretrained_control=None,
+def predict_models(treatment="topics", feature="books", trained_group="F", pretrained_epoch=None, pretrained_control=None,
                    sentiment_model_ckpt=None, itt_model_ckpt=None, itc_model_ckpt=None, bert_state_dict=None):
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
         reviews_features_treat_dict = json.load(jsonfile)
-    treated_feature = reviews_features_treat_dict[domain]["treated_feature"]
-    control_features = reviews_features_treat_dict[domain]["control_features"][-1]
+    treated_feature = reviews_features_treat_dict[feature]["treated_feature"]
+    control_features = reviews_features_treat_dict[feature]["control_features"][-1]
 
     hparams = {
         "treatment": treatment,
-        "domain": domain,
+        "domain": feature,
         "trained_group": trained_group,
         "treatment_column": f"{treated_feature}",
         "control_column": f"{control_features}",
@@ -127,7 +127,7 @@ def predict_models(treatment="topics", domain="books", trained_group="F", pretra
             "bert_state_dict": bert_state_dict
         }
     }
-    OUTPUT_DIR = f"{REVIEWS_FEATURES_EXPERIMENTS_DIR}/{treatment}/{domain}/COMPARE"
+    OUTPUT_DIR = f"{REVIEWS_FEATURES_EXPERIMENTS_DIR}/{treatment}/{feature}/COMPARE"
     trainer = Trainer(gpus=1 if DEVICE.type == "cuda" else 0,
                       default_save_path=OUTPUT_DIR,
                       show_progress_bar=True,
@@ -137,7 +137,7 @@ def predict_models(treatment="topics", domain="books", trained_group="F", pretra
     for task, model in zip((TASK, "CONTROL_ITT", "CONTROL_ICT"),
                            (sentiment_model_ckpt, itt_model_ckpt, itc_model_ckpt)):
         for group in ("F",):
-            predict_models_unit(task, treatment, domain, trained_group, group, model,
+            predict_models_unit(task, treatment, feature, trained_group, group, model,
                                 hparams, trainer, logger, pretrained_epoch, pretrained_control, bert_state_dict)
     handler = GoogleDriveHandler()
     push_message = handler.push_files(hparams["output_path"])
