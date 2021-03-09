@@ -107,7 +107,7 @@ def train_all_models(args, domain: str):
     if args.pretrained_epoch is not None:
         pretrained_treated_model_dir = f"{pretrained_treated_model_dir}/epoch_{args.pretrained_epoch}"
 
-    treatment = "topics"
+    treatment = "persuasion"
 
     hparams = {
         "treatment": treatment,

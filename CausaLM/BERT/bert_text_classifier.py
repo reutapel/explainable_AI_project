@@ -296,6 +296,7 @@ class BertTextClassificationDataset(BertTextDataset):
                  bert_pretrained_model: str = BERT_PRETRAINED_MODEL, max_seq_length: int = MAX_SENTIMENT_SEQ_LENGTH):
         super().__init__(data_path, treatment, subset, text_column, label_column, bert_pretrained_model, max_seq_length)
 
+    #read input example
     def read_examples_func(self, row):
         return InputExample(unique_id=int(row.iloc[0]), text=str(row[self.text_column]), label=int(row[self.label_column]))
 
