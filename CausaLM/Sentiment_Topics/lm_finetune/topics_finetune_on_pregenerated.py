@@ -369,7 +369,8 @@ def main():
                         type=int,
                         default=RANDOM_SEED,
                         help="random seed for initialization")
-    parser.add_argument("--domain", type=str, default="books", choices=SENTIMENT_DOMAINS)
+    #todo: change SENTIMENT_DOMAINS
+    parser.add_argument("--domain", type=str, default="topic_price_positive", choices=SENTIMENT_DOMAINS)
     parser.add_argument("--control", action="store_true",
                         help="Use pretraining model with control task")
     args = parser.parse_args()

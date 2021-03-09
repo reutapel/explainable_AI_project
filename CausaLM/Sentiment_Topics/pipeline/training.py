@@ -1,16 +1,16 @@
 import json
 
-from constants import SENTIMENT_EXPERIMENTS_DIR, MAX_SENTIMENT_SEQ_LENGTH, SENTIMENT_DOMAINS, \
-    SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_TOPICS_PRETRAIN_IXT_DIR
+from CausaLM.constants import SENTIMENT_EXPERIMENTS_DIR, MAX_SENTIMENT_SEQ_LENGTH, SENTIMENT_DOMAINS, \
+    SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, REVIEWS_FEATURES_DATASETS_DIR, REVIEWS_FEATURES_PRETRAIN_IXT_DIR
 from pytorch_lightning import Trainer
-from BERT.bert_text_classifier import LightningBertPretrainedClassifier, LightningHyperparameters
-from Sentiment_Topics.pipeline.predict import print_final_metrics, predict_models
+from CausaLM.BERT.bert_text_classifier import LightningBertPretrainedClassifier, LightningHyperparameters
+from CausaLM.Sentiment_Topics.pipeline.predict import print_final_metrics, predict_models
 
 from argparse import ArgumentParser
 from typing import Dict
 import torch
 
-from utils import init_logger
+from CausaLM.utils import init_logger
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ### Constants
@@ -58,7 +58,7 @@ def bert_train_eval(hparams, output_dir):
 
 def train_models_unit(hparams: Dict, task, group, pretrained_control):
     label_size = 2
-    if task == "Sentiment":
+    if task == TASK:
         label_column = f"{task.lower()}_label"
     elif task == "ITT":
         label_column = hparams["treatment_column"]
@@ -101,9 +101,9 @@ def train_all_models(args, domain: str):
     control_topic = domain_topic_treat_dict[domain]["control_topics"][-1]
 
     if args.pretrained_control:
-        pretrained_treated_model_dir = f"{SENTIMENT_TOPICS_PRETRAIN_IXT_DIR}/{domain}/model_control"
+        pretrained_treated_model_dir = f"{REVIEWS_FEATURES_PRETRAIN_IXT_DIR}/{domain}/model_control"
     else:
-        pretrained_treated_model_dir = f"{SENTIMENT_TOPICS_PRETRAIN_IXT_DIR}/{domain}/model"
+        pretrained_treated_model_dir = f"{REVIEWS_FEATURES_PRETRAIN_IXT_DIR}/{domain}/model"
     if args.pretrained_epoch is not None:
         pretrained_treated_model_dir = f"{pretrained_treated_model_dir}/epoch_{args.pretrained_epoch}"
 
@@ -111,7 +111,7 @@ def train_all_models(args, domain: str):
 
     hparams = {
         "treatment": treatment,
-        "data_path": SENTIMENT_TOPICS_DATASETS_DIR,
+        "data_path": REVIEWS_FEATURES_DATASETS_DIR,
         "domain": domain,
         "treatment_column": f"{treatment_topic}_bin",
         "control_column": f"{control_topic}_bin",
