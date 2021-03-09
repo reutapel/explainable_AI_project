@@ -1,6 +1,6 @@
 from random import random
 from torch.utils.data import TensorDataset, Dataset
-from transformers.models.bert.tokenization_bert import BertTokenizer
+from transformers.tokenization_bert import BertTokenizer
 from CausaLM.constants import BERT_PRETRAINED_MODEL, MAX_SENTIMENT_SEQ_LENGTH
 from abc import abstractmethod
 from typing import List

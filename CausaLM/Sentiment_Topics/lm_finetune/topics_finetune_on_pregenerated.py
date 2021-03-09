@@ -15,14 +15,14 @@ from tqdm import tqdm
 
 from transformers.tokenization_bert import BertTokenizer
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
-from Sentiment_Topics.lm_finetune.pregenerate_training_data import EPOCHS
-from Sentiment_Topics.lm_finetune.bert_topics_finetune import BertForTopicTreatControlPreTraining, \
+from CausaLM.Sentiment_Topics.lm_finetune.pregenerate_training_data import EPOCHS
+from CausaLM.Sentiment_Topics.lm_finetune.bert_topics_finetune import BertForTopicTreatControlPreTraining, \
     BertForTopicTreatPreTraining
-from BERT.bert_text_dataset import BertTextDataset
-from utils import init_logger
+from CausaLM.BERT.bert_text_dataset import BertTextDataset
+from CausaLM.utils import init_logger
 
-from constants import RANDOM_SEED, SENTIMENT_TOPICS_PRETRAIN_DIR, BERT_PRETRAINED_MODEL, NUM_CPU, \
-    SENTIMENT_TOPICS_PRETRAIN_DATA_DIR, SENTIMENT_TOPICS_PRETRAIN_IXT_DIR, SENTIMENT_DOMAINS
+from CausaLM.constants import RANDOM_SEED, REVIEWS_FEATURES_PRETRAIN_DIR, BERT_PRETRAINED_MODEL, NUM_CPU, \
+    REVIEWS_FEATURES_PRETRAIN_DATA_DIR, REVIEWS_FEATURES_PRETRAIN_IXT_DIR, SENTIMENT_DOMAINS
 
 BATCH_SIZE = 6
 FP16 = False
@@ -31,7 +31,7 @@ InputFeatures = namedtuple("InputFeatures", "input_ids input_mask lm_label_ids t
 
 # log_format = '%(asctime)-10s: %(message)s'
 # logging.basicConfig(level=logging.INFO, format=log_format)
-logger = init_logger("Sentiment-Topics-pretraining", f"{SENTIMENT_TOPICS_PRETRAIN_DIR}")
+logger = init_logger("Sentiment-Topics-pretraining", f"{REVIEWS_FEATURES_PRETRAIN_DIR}")
 
 
 def convert_example_to_features(example, tokenizer, max_seq_length):
@@ -327,7 +327,7 @@ def main():
                              "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
     parser.add_argument("--do_lower_case", action="store_true")
     parser.add_argument("--reduce_memory", action="store_true",
-                        help="Store training data as on-disc memmaps to massively reduce memory usage")
+                        help="Store training data as on-disc maps to massively reduce memory usage")
 
     parser.add_argument("--epochs", type=int, default=EPOCHS, help="Number of epochs to train for")
     parser.add_argument("--local_rank",
@@ -376,11 +376,11 @@ def main():
 
     logger.info(f"\nFinetuning for domain: {args.domain}")
 
-    args.pregenerated_data = Path(SENTIMENT_TOPICS_PRETRAIN_DATA_DIR) / args.domain
+    args.pregenerated_data = Path(REVIEWS_FEATURES_PRETRAIN_DATA_DIR) / args.domain
     if args.control:
-        args.output_dir = Path(SENTIMENT_TOPICS_PRETRAIN_IXT_DIR) / args.domain / "model_control"
+        args.output_dir = Path(REVIEWS_FEATURES_PRETRAIN_IXT_DIR) / args.domain / "model_control"
     else:
-        args.output_dir = Path(SENTIMENT_TOPICS_PRETRAIN_IXT_DIR) / args.domain / "model"
+        args.output_dir = Path(REVIEWS_FEATURES_PRETRAIN_IXT_DIR) / args.domain / "model"
 
     args.fp16 = FP16
     pretrain_on_domain(args)

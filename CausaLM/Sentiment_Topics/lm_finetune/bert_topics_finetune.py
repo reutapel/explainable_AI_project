@@ -1,6 +1,6 @@
 from transformers.modeling_bert import BertLMPredictionHead, BertPreTrainedModel, BertModel
-from BERT.bert_text_dataset import BertTextDataset
-from BERT.lm_finetune.grad_reverse_layer import GradReverseLayerFunction
+from CausaLM.BERT.bert_text_dataset import BertTextDataset
+from CausaLM.BERT.lm_finetune.grad_reverse_layer import GradReverseLayerFunction
 from torch.nn import CrossEntropyLoss
 import torch.nn as nn
 import torch
