@@ -1,7 +1,7 @@
 import json
 
-from CausaLM.constants import SENTIMENT_EXPERIMENTS_DIR, MAX_SENTIMENT_SEQ_LENGTH, SENTIMENT_DOMAINS, \
-    SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, SENTIMENT_TOPICS_DATASETS_DIR, SENTIMENT_TOPICS_PRETRAIN_IXT_DIR
+from CausaLM.constants import REVIEWS_MODELS_DIR, MAX_SENTIMENT_SEQ_LENGTH, REVIEWS_FEATURES, \
+    REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, REVIEWS_FEATURES_DATASETS_DIR, REVIEWS_FEATURES_PRETRAIN_IXT_DIR, TASK
 from pytorch_lightning import Trainer
 from CausaLM.BERT.bert_text_classifier import LightningBertPretrainedClassifier, LightningHyperparameters
 from CausaLM.Reviews_Features.pipeline.predict import print_final_metrics, predict_models
@@ -23,7 +23,7 @@ FP16 = False
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--domain", type=str, default="books", choices=SENTIMENT_DOMAINS),
+    parser.add_argument("--domain", type=str, default="topic_price_positive", choices=REVIEWS_FEATURES),
     parser.add_argument("--group", type=str, required=False, default="F",
                         help="Specify data group for experiments: F (factual) or CF (counterfactual)")
     parser.add_argument("--pretrained_epoch", type=int, required=False, default=0,
@@ -58,7 +58,7 @@ def bert_train_eval(hparams, output_dir):
 
 def train_models_unit(hparams: Dict, task, group, pretrained_control):
     label_size = 2
-    if task == "Sentiment":
+    if task == TASK:
         label_column = f"{task.lower()}_label"
     elif task == "ITT":
         label_column = hparams["treatment_column"]
@@ -74,7 +74,7 @@ def train_models_unit(hparams: Dict, task, group, pretrained_control):
                 "name"] = f"{task}_{group}_topic_{hparams['treatment_column'].split('_')[1]}_treated"
     else:
         hparams["bert_params"]["name"] = f"{task}_{group}"
-    OUTPUT_DIR = f"{SENTIMENT_EXPERIMENTS_DIR}/{hparams['treatment']}/{hparams['domain']}/{hparams['bert_params']['name']}"
+    OUTPUT_DIR = f"{REVIEWS_MODELS_DIR}/{hparams['treatment']}/{hparams['domain']}/{hparams['bert_params']['name']}"
     model = bert_train_eval(hparams, OUTPUT_DIR)
     return model
 
@@ -94,16 +94,16 @@ def train_models(hparams: Dict, group: str, pretrained_epoch: int, pretrained_co
 
 
 def train_all_models(args, domain: str):
-    with open(SENTIMENT_TOPICS_DOMAIN_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
-        domain_topic_treat_dict = json.load(jsonfile)
+    with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
+        review_features_treat_dict = json.load(jsonfile)
 
-    treatment_topic = domain_topic_treat_dict[domain]["treated_topic"]
-    control_topic = domain_topic_treat_dict[domain]["control_topics"][-1]
+    treatment_topic = review_features_treat_dict[domain]["treated_feature"]
+    control_topic = review_features_treat_dict[domain]["control_features"][-1]
 
     if args.pretrained_control:
-        pretrained_treated_model_dir = f"{SENTIMENT_TOPICS_PRETRAIN_IXT_DIR}/{domain}/model_control"
+        pretrained_treated_model_dir = f"{REVIEWS_FEATURES_PRETRAIN_IXT_DIR}/{domain}/model_control"
     else:
-        pretrained_treated_model_dir = f"{SENTIMENT_TOPICS_PRETRAIN_IXT_DIR}/{domain}/model"
+        pretrained_treated_model_dir = f"{REVIEWS_FEATURES_PRETRAIN_IXT_DIR}/{domain}/model"
     if args.pretrained_epoch is not None:
         pretrained_treated_model_dir = f"{pretrained_treated_model_dir}/epoch_{args.pretrained_epoch}"
 
@@ -111,12 +111,12 @@ def train_all_models(args, domain: str):
 
     hparams = {
         "treatment": treatment,
-        "data_path": SENTIMENT_TOPICS_DATASETS_DIR,
+        "data_path": REVIEWS_FEATURES_DATASETS_DIR,
         "domain": domain,
-        "treatment_column": f"{treatment_topic}_bin",
-        "control_column": f"{control_topic}_bin",
+        "treatment_column": f"{treatment_topic}",
+        "control_column": f"{control_topic}",
         "text_column": "review",
-        "label_column": "sentiment_label",
+        "label_column": f"{TASK}_label",
         "epochs": args.epochs,
         "epochs": args.epochs,
         "accumulate": ACCUMULATE,
