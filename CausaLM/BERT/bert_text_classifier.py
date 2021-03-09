@@ -186,7 +186,7 @@ class LightningBertPretrainedClassifier(LightningModule):
         if parameters_list:
             return torch.optim.Adam(parameters_list)
         else:
-            return [] # PyTorch Lightning hack for test mode with frozen model
+            return []  # PyTorch Lightning hack for test mode with frozen model
 
     def forward(self, *args):
         return self.bert_classifier.forward(*args)
@@ -194,7 +194,7 @@ class LightningBertPretrainedClassifier(LightningModule):
     @data_loader
     def train_dataloader(self):
         if not self.training:
-            return [] # PyTorch Lightning hack for test mode with frozen model
+            return []  # PyTorch Lightning hack for test mode with frozen model
         dataset = BertTextClassificationDataset(self.hparams.data_path, self.hparams.treatment, "train",
                                                 self.hparams.text_column, self.hparams.label_column,
                                                 max_seq_length=self.hparams.max_seq_len)
