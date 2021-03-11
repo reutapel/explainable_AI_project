@@ -107,3 +107,11 @@ def get_TPR_GAP(y_pred: np.ndarray, y_true: np.ndarray, z_treatment: np.ndarray)
 def get_confidence_intervals(results_array: np.ndarray, final_result: float) -> Tuple[float, float]:
     results_interval = 1.96 * results_array.std() / np.sqrt(len(results_array))
     return final_result - results_interval, final_result + results_interval
+
+
+def main():
+    get_TReATE()
+
+
+if __name__ == '__main__':
+    main()

@@ -91,6 +91,7 @@ class BertTextDataset(Dataset):
 
         return TensorDataset(all_input_ids, all_input_mask, all_labels, all_unique_id)
 
+
 def print_seq_lengths_stats(logger, text_seq_lengths, max_seq_length):
     logger.info(f"Num Sequences: {len(text_seq_lengths)}")
     logger.info(f"Minimum Sequence Length: {np.min(text_seq_lengths)}")
