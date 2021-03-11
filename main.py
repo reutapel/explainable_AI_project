@@ -13,7 +13,7 @@ import copy
 import random
 import joblib
 import sys
-# import XAI_Methods
+import XAI_Methods
 from pathlib import Path
 from typing import Union
 
@@ -462,27 +462,27 @@ if __name__ == '__main__':
                               model_type=outer_model_type, features_to_remove=features_to_remove)
 
     # SHAP run
-    #     for model_type in best_models_paths_dict.keys():
-    #         if model_type not in ['RandomForest', 'XGBoost', 'CatBoost']:
-    #             continue
-    #         print(f'\n computing SHAP values of {model_type}')
-    #         pkl_model_path = Path(best_models_paths_dict[model_type])
-    #         model = joblib.load(pkl_model_path)
-    #         root_path = Path("data/verbal/models_input")
-    #         X_test_path = root_path.joinpath(outer_test_data_file_name)
-    #         X_test = joblib.load(X_test_path)
-    #         X_test = X_test[['text_features']]
-    #
-    #         outer_train_data_file_name = outer_test_data_file_name.replace('test', 'train')
-    #         X_train_path = root_path.joinpath(outer_test_data_file_name)
-    #         X_train = joblib.load(X_train_path)
-    #         X_train = X_train[['text_features']]
-    #
-    #         # create a file for the SHAP results to be saved at
-    #         save_shap_values_path = pkl_model_path.parent.joinpath('SAHP_values_results')
-    #         save_shap_values_path.mkdir(exist_ok=True)
-    #
-    #         shap_obj = XAI_Methods.XAIMethods(model, X_test, X_train, 'SHAP', model_type)
-    #         shap_res = shap_obj.get_shap_feature_mean_values()
-    #         shap_res_save_path = save_shap_values_path.joinpath(pkl_model_path.name.replace('pkl','csv'))
-    #         shap_res.to_csv(shap_res_save_path)
+        for model_type in best_models_paths_dict.keys():
+            if model_type not in ['RandomForest', 'XGBoost', 'CatBoost']:
+                continue
+            print(f'\n computing SHAP values of {model_type}')
+            pkl_model_path = Path(best_models_paths_dict[model_type])
+            model = joblib.load(pkl_model_path)
+            root_path = Path("data/verbal/models_input")
+            X_test_path = root_path.joinpath(outer_test_data_file_name)
+            X_test = joblib.load(X_test_path)
+            X_test = X_test[['text_features']]
+
+            outer_train_data_file_name = outer_test_data_file_name.replace('test', 'train')
+            X_train_path = root_path.joinpath(outer_test_data_file_name)
+            X_train = joblib.load(X_train_path)
+            X_train = X_train[['text_features']]
+
+            # create a file for the SHAP results to be saved at
+            save_shap_values_path = pkl_model_path.parent.joinpath('SAHP_values_results')
+            save_shap_values_path.mkdir(exist_ok=True)
+
+            shap_obj = XAI_Methods.XAIMethods(model, X_test, X_train, 'SHAP', model_type)
+            shap_res = shap_obj.get_shap_feature_mean_values()
+            shap_res_save_path = save_shap_values_path.joinpath(pkl_model_path.name.replace('pkl','csv'))
+            shap_res.to_csv(shap_res_save_path)
