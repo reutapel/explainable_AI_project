@@ -6,6 +6,7 @@ from collections import defaultdict
 import sklearn.metrics as metrics
 import numpy as np
 import math
+from typing import Union
 
 base_directory = os.path.abspath(os.curdir)
 
@@ -97,15 +98,16 @@ def write_to_excel(table_writer: pd.ExcelWriter, sheet_name: str, headers: list,
 
 
 def load_data(data_path: str, label_name: str, features_families: list,  test_pair_ids: list, train_pair_ids: list=None,
-              id_column: str='pair_id'):
+              id_column: str='pair_id', features_to_remove: Union[list, str]=None):
     """
     Load data from data_path and return: train_x, train_y, test_x, test_y
     :param data_path: path to data
     :param label_name: the label column name
-    :param features_families: the families of feautres to use
+    :param features_families: the families of features to use
     :param train_pair_ids: the pair ids for train data, if None- return only test data
     :param test_pair_ids: the pair ids for test data
     :param id_column: the name of the ID columns
+    :param features_to_remove: list of features we don't want to use
     :return:
     """
 
@@ -126,6 +128,13 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
             raise ValueError
         train_y = train_data[label_name]
         train_x = train_data[features_families]
+        train_x.columns = train_x.columns.get_level_values(1)
+        if features_to_remove is not None:
+            if type(features_to_remove) == str:
+                train_x_columns = [column for column in train_x.columns if features_to_remove not in column]
+            else:
+                train_x_columns = [column for column in train_x.columns if column not in features_to_remove]
+            train_x = train_x[train_x_columns]
     else:
         train_y = None
         train_x = None
@@ -141,6 +150,14 @@ def load_data(data_path: str, label_name: str, features_families: list,  test_pa
         raise ValueError
     test_y = test_data[label_name]
     test_x = test_data[features_families]
+    test_x.columns = test_x.columns.get_level_values(1)
+
+    if features_to_remove is not None:
+        if type(features_to_remove) == str:
+            test_x_columns = [column for column in test_x.columns if features_to_remove not in column]
+        else:
+            test_x_columns = [column for column in test_x.columns if column not in features_to_remove]
+        test_x = test_x[test_x_columns]
 
     return train_x, train_y, test_x, test_y
 

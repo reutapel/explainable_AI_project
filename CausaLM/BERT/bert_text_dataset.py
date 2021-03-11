@@ -86,7 +86,7 @@ class BertTextDataset(Dataset):
             input_labels_list.append(l.label)
         all_input_ids = torch.tensor(input_ids_list, dtype=torch.long)
         all_input_mask = torch.tensor(input_masks_list, dtype=torch.long)
-        all_labels = torch.tensor(input_labels_list, dtype=torch.float64)
+        all_labels = torch.tensor(input_labels_list, dtype=torch.double)
         all_unique_id = torch.tensor(input_unique_id_list, dtype=torch.long)
 
         return TensorDataset(all_input_ids, all_input_mask, all_labels, all_unique_id)

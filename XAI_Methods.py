@@ -1,7 +1,7 @@
 '''https://iancovert.com/blog/understanding-shap-sage/'''
 '''https://github.com/iancovert/sage'''
 '''pip install sage-importance'''
-import sage
+# import sage
 '''https://github.com/slundberg/shap'''
 import shap
 import xgboost
@@ -14,8 +14,6 @@ import pickle
 import joblib
 from pathlib import Path
 import os
-
-
 
 
 class XAIMethods:

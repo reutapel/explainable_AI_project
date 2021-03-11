@@ -86,12 +86,12 @@ class PredictiveModel:
 
     def fit(self, train_x: pd.DataFrame, train_y: pd.Series):
         train_x = train_x[self.features]
-        train_x.columns = [' '.join(col).strip() for col in train_x.columns.values]
+        # train_x.columns = [' '.join(col).strip() for col in train_x.columns.values]
         self.model = self.model.fit(train_x, train_y.values.ravel())
 
     def predict(self, validation_x: pd.DataFrame, validation_y: pd.Series):
         validation_x = validation_x[self.features]
-        validation_x.columns = [' '.join(col).strip() for col in validation_x.columns.values]
+        # validation_x.columns = [' '.join(col).strip() for col in validation_x.columns.values]
         if 'xgboost' in str.lower(self.model_name):
             validation_x = validation_x[self.model._Booster.feature_names]
         predictions = self.model.predict(validation_x)

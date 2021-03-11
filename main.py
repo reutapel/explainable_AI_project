@@ -15,6 +15,7 @@ import joblib
 import sys
 # import XAI_Methods
 from pathlib import Path
+from typing import Union
 
 random.seed(123)
 
@@ -117,7 +118,8 @@ def execute_create_fit_predict_eval_model(model_num, features, train_x, train_y,
 # @ray.remote
 def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: str, data_file_name: str,
                           features_families: list, hyper_parameters_tune_mode: bool=False,
-                          test_data_file_name: str=None, id_column: str='pair_id', model_type: str='regression'):
+                          test_data_file_name: str=None, id_column: str='pair_id', model_type: str='regression',
+                          features_to_remove: Union[list, str] = None):
     """
     This function get a dict that split the participant to train-val-test (for this fold) and run all the models
     we want to compare --> it train them using the train data and evaluate them using the val data
@@ -130,6 +132,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     :param id_column: the name of the ID column
     :param test_data_file_name: the test_data_file_name
     :param model_type: is this a regression model or a classification model
+    :param features_to_remove: features we want to remove
     :return:
     """
     # get the train, test, validation participant code for this fold
@@ -177,9 +180,13 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     train_x, train_y, validation_x, validation_y = utils.load_data(data_path=data_path, label_name='label',
                                                                    features_families=features_families,
                                                                    test_pair_ids=validation_pair_ids,
-                                                                   train_pair_ids=train_pair_ids, id_column=id_column)
+                                                                   train_pair_ids=train_pair_ids, id_column=id_column,
+                                                                   features_to_remove=features_to_remove)
     _, _, test_x, test_y = utils.load_data(data_path=test_data_path, label_name='label', id_column=id_column,
-                                           features_families=features_families, test_pair_ids=test_pair_ids)
+                                           features_families=features_families, test_pair_ids=test_pair_ids,
+                                           features_to_remove=features_to_remove)
+
+    data_features = train_x.columns.tolist()
 
     model_names = ['SVM', 'mean', 'median', 'RandomForest', 'XGBoost', 'CatBoost']  # , 'lightGBM', '']
 
@@ -204,7 +211,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
                 new_model_num = f'{model_num}_{i}'
                 print(f'start model {model_name} with number {new_model_num} for fold {fold}')
                 all_models_results = execute_create_fit_predict_eval_model(
-                    model_num=new_model_num, features=features_families, train_x=train_x, train_y=train_y,
+                    model_num=new_model_num, features=data_features, train_x=train_x, train_y=train_y,
                     test_x=validation_x, test_y=validation_y, fold=fold, fold_dir=fold_dir, model_name=model_name,
                     excel_models_results_folder=excel_models_results, hyper_parameters_dict=parameters_dict,
                     all_models_results=all_models_results, model_num_results_path=model_num_results_path,
@@ -213,7 +220,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
         else:  # no hyper parameters
             parameters_dict = default_gridsearch_params[model_name]
             all_models_results = execute_create_fit_predict_eval_model(
-                model_num=model_num, features=features_families, train_x=train_x, train_y=train_y,
+                model_num=model_num, features=data_features, train_x=train_x, train_y=train_y,
                 test_x=validation_x, test_y=validation_y, fold=fold, fold_dir=fold_dir, model_name=model_name,
                 excel_models_results_folder=excel_models_results, hyper_parameters_dict=parameters_dict,
                 all_models_results=all_models_results, model_num_results_path=model_num_results_path,
@@ -269,7 +276,7 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
 
         # create model class with trained_model
         test_model_class = predictive_models.PredictiveModel(
-            features_families, model_name, hyper_parameters_dict, model_num, fold, fold_dir,
+            data_features, model_name, hyper_parameters_dict, model_num, fold, fold_dir,
             excel_test_models_results, trained_model=trained_model, model_type=model_type)
 
         test_predictions = test_model_class.predict(test_x, test_y)
@@ -295,7 +302,8 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
     return f'fold {fold} finish compare models', best_models_paths_dict
 
 
-def parallel_main(data_file_name: str, features_families: list, test_data_file_name: str, model_type: str):
+def parallel_main(data_file_name: str, features_families: list, test_data_file_name: str, model_type: str,
+                  features_to_remove: Union[list, str] = None):
     print(f'Start run in parallel: for each fold compare all the models')
     logging.info(f'Start run in parallel: for each fold compare all the models')
 
@@ -320,7 +328,8 @@ def parallel_main(data_file_name: str, features_families: list, test_data_file_n
         ray.get([execute_fold_parallel.remote(participants_fold_split[f'fold_{i}'], i, str(cuda_devices[i]),
                                               hyper_parameters_tune_mode=True, data_file_name=data_file_name,
                                               test_data_file_name=test_data_file_name, model_type=model_type,
-                                              features_families=features_families, id_column=id_column)
+                                              features_families=features_families, id_column=id_column,
+                                              features_to_remove=features_to_remove)
                  for i in range(6)])
 
     print(f'Done! {all_ready_lng}')
@@ -330,7 +339,7 @@ def parallel_main(data_file_name: str, features_families: list, test_data_file_n
 
 
 def not_parallel_main(data_file_name: str, test_data_file_name: str, features_families: list, model_type: str,
-                      is_debug: bool=False, num_folds: int=1):
+                      is_debug: bool=False, num_folds: int=1, features_to_remove: Union[list, str] = None):
     print(f'Start run in parallel: for each fold compare all the models')
     logging.info(f'Start run in parallel: for each fold compare all the models')
 
@@ -355,7 +364,7 @@ def not_parallel_main(data_file_name: str, test_data_file_name: str, features_fa
             execute_fold_parallel(participants_fold_split[f'fold_{fold}'], fold=fold, cuda_device='1',
                                   hyper_parameters_tune_mode=False, data_file_name=data_file_name,
                                   test_data_file_name=test_data_file_name, features_families=features_families,
-                                  id_column=id_column, model_type=model_type)
+                                  id_column=id_column, model_type=model_type, features_to_remove=features_to_remove)
 
     if models_paths_dict is None:
         print('No model paths were saved')
@@ -438,39 +447,42 @@ if __name__ == '__main__':
     else:
         outer_model_type = 'regression'
 
+    features_to_remove = 'len'
+
     # read function
     if is_parallel:
         best_models_paths_dict =\
             parallel_main(features_families=outer_features_families, data_file_name=outer_data_file_name,
-                          test_data_file_name=outer_test_data_file_name, model_type=outer_model_type)
+                          test_data_file_name=outer_test_data_file_name, model_type=outer_model_type,
+                          features_to_remove=features_to_remove)
     else:
         best_models_paths_dict =\
             not_parallel_main(is_debug=outer_is_debug, features_families=outer_features_families,
                               data_file_name=outer_data_file_name, test_data_file_name=outer_test_data_file_name,
-                              model_type=outer_model_type)
+                              model_type=outer_model_type, features_to_remove=features_to_remove)
 
-    #SHAP run
-        # for model_type in best_models_paths_dict.keys():
-        #     if model_type not in ['RandomForest', 'XGBoost', 'CatBoost']:
-        #         continue
-        #     print(f'\n computing SHAP values of {model_type}')
-        #     pkl_model_path = Path(best_models_paths_dict[model_type])
-        #     model = joblib.load(pkl_model_path)
-        #     root_path = Path("data/verbal/models_input")
-        #     X_test_path = root_path.joinpath(outer_test_data_file_name)
-        #     X_test = joblib.load(X_test_path)
-        #     X_test = X_test[['text_features']]
-        #
-        #     outer_train_data_file_name = outer_test_data_file_name.replace('test', 'train')
-        #     X_train_path = root_path.joinpath(outer_test_data_file_name)
-        #     X_train = joblib.load(X_train_path)
-        #     X_train = X_train[['text_features']]
-        #
-        #     # create a file for the SHAP results to be saved at
-        #     save_shap_values_path = pkl_model_path.parent.joinpath('SAHP_values_results')
-        #     save_shap_values_path.mkdir(exist_ok=True)
-        #
-        #     shap_obj = XAI_Methods.XAIMethods(model, X_test, X_train, 'SHAP', model_type)
-        #     shap_res = shap_obj.get_shap_feature_mean_values()
-        #     shap_res_save_path = save_shap_values_path.joinpath(pkl_model_path.name.replace('pkl','csv'))
-        #     shap_res.to_csv(shap_res_save_path)
+    # SHAP run
+    #     for model_type in best_models_paths_dict.keys():
+    #         if model_type not in ['RandomForest', 'XGBoost', 'CatBoost']:
+    #             continue
+    #         print(f'\n computing SHAP values of {model_type}')
+    #         pkl_model_path = Path(best_models_paths_dict[model_type])
+    #         model = joblib.load(pkl_model_path)
+    #         root_path = Path("data/verbal/models_input")
+    #         X_test_path = root_path.joinpath(outer_test_data_file_name)
+    #         X_test = joblib.load(X_test_path)
+    #         X_test = X_test[['text_features']]
+    #
+    #         outer_train_data_file_name = outer_test_data_file_name.replace('test', 'train')
+    #         X_train_path = root_path.joinpath(outer_test_data_file_name)
+    #         X_train = joblib.load(X_train_path)
+    #         X_train = X_train[['text_features']]
+    #
+    #         # create a file for the SHAP results to be saved at
+    #         save_shap_values_path = pkl_model_path.parent.joinpath('SAHP_values_results')
+    #         save_shap_values_path.mkdir(exist_ok=True)
+    #
+    #         shap_obj = XAI_Methods.XAIMethods(model, X_test, X_train, 'SHAP', model_type)
+    #         shap_res = shap_obj.get_shap_feature_mean_values()
+    #         shap_res_save_path = save_shap_values_path.joinpath(pkl_model_path.name.replace('pkl','csv'))
+    #         shap_res.to_csv(shap_res_save_path)
