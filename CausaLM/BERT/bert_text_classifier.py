@@ -96,8 +96,8 @@ class HAN_Attention_Pooler_Layer(nn.Module):
 
 class BertPretrainedClassifier(nn.Module):
     def __init__(self, batch_size: int = 8, dropout: float = 0.1, label_size: int = 1,
-                 loss_func: Callable = nn.MSELoss, bert_pretrained_model: str = BERT_PRETRAINED_MODEL,
-                 bert_state_dict: str = None, name: str = "OOB", device: torch.device = None):
+                 loss_func: Callable = F.cross_entropy, bert_pretrained_model: str = BERT_PRETRAINED_MODEL,
+                 bert_state_dict: str = None, name: str = "OOB", device: torch.device = None, loss_func_name: str = "cross_entropy"):
         super().__init__()
         self.name = f"{self.__class__.__name__}-{name}"
         self.batch_size = batch_size
@@ -116,13 +116,19 @@ class BertPretrainedClassifier(nn.Module):
         self.hidden_size = self.bert.config.hidden_size
         self.pooler = HAN_Attention_Pooler_Layer(self.hidden_size)
         self.classifier = Linear_Layer(self.hidden_size, label_size, dropout, activation=None)
+        self.loss_func_name = loss_func_name
+        if self.loss_func_name == 'MSE':
+            self.loss_func = nn.MSELoss()
 
     def forward(self, input_ids: torch.Tensor, input_mask: torch.Tensor, labels: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         last_hidden_states_seq, _ = self.bert(input_ids, attention_mask=input_mask)
         # pooler_mask = self.pooler.create_mask(input_mask.sum(dim=1), input_mask.size(1))
         pooled_seq_vector, attention_weights = self.pooler(last_hidden_states_seq, input_mask)
         logits = self.classifier(pooled_seq_vector)
-        loss = self.loss_func(logits.view(-1, self.label_size), labels.view(-1))
+        if self.loss_func_name == 'MSE':
+            loss = self.loss_func(logits, labels.view(labels.shape[0], -1))
+        else:
+            loss = self.loss_func(logits.view(-1, self.label_size), labels.view(-1))
         return loss, logits, attention_weights
 
     @staticmethod

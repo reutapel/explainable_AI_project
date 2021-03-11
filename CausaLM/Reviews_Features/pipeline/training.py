@@ -11,6 +11,7 @@ from typing import Dict
 import torch
 
 from CausaLM.utils import init_logger
+import torch.nn as nn
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ### Constants
@@ -61,6 +62,8 @@ def train_models_unit(hparams: Dict, task, group, pretrained_control):
     label_size = hparams['bert_params']['label_size']
     if task == TASK:
         label_column = f"{task.lower()}_label"
+        if str.lower(task) == 'proportion':
+            hparams['bert_params']['loss_func_name'] = 'MSE'
     elif task == "ITT":
         label_column = hparams["treatment_column"]
     else:
