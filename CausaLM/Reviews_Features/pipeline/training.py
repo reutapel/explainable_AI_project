@@ -118,7 +118,6 @@ def train_all_models(args, domain: str):
         "text_column": "review",
         "label_column": f"{TASK}_label",
         "epochs": args.epochs,
-        "epochs": args.epochs,
         "accumulate": ACCUMULATE,
         "max_seq_len": MAX_SENTIMENT_SEQ_LENGTH,
         "bert_params": {
