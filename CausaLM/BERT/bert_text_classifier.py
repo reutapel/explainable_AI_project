@@ -3,7 +3,7 @@ from tqdm import tqdm
 from transformers import BertModel
 from torch.utils.data.dataloader import DataLoader
 from CausaLM.datasets.utils import CLS_TOKEN, SEP_TOKEN
-from CausaLM.constants import NUM_CPU, MAX_SENTIMENT_SEQ_LENGTH
+from CausaLM.constants import NUM_CPU, MAX_SENTIMENT_SEQ_LENGTH, TASK
 from CausaLM.BERT.bert_text_dataset import BERT_PRETRAINED_MODEL, BertTextDataset, InputExample, InputLabel,\
     InputFeatures, truncate_seq_first
 from pytorch_lightning import LightningModule, data_loader
@@ -95,12 +95,13 @@ class HAN_Attention_Pooler_Layer(nn.Module):
 
 
 class BertPretrainedClassifier(nn.Module):
-    def __init__(self, batch_size: int = 8, dropout: float = 0.1, label_size: int = 2,
-                 loss_func: Callable = F.cross_entropy, bert_pretrained_model: str = BERT_PRETRAINED_MODEL,
+    def __init__(self, batch_size: int = 8, dropout: float = 0.1, label_size: int = 1,
+                 loss_func: Callable = nn.MSELoss, bert_pretrained_model: str = BERT_PRETRAINED_MODEL,
                  bert_state_dict: str = None, name: str = "OOB", device: torch.device = None):
         super().__init__()
         self.name = f"{self.__class__.__name__}-{name}"
         self.batch_size = batch_size
+        # change the label size
         self.label_size = label_size
         self.dropout = dropout
         self.loss_func = loss_func
@@ -111,6 +112,7 @@ class BertPretrainedClassifier(nn.Module):
         # self.config = BertConfigTuple(hidden_size=encoding_dim, num_attention_heads=4,
         #                               attention_probs_dropout_prob=0.1, hidden_dropout_prob=0.1)
         # self.attention = BertAttention(self.bert_config)
+        # todo: should be changed?
         self.hidden_size = self.bert.config.hidden_size
         self.pooler = HAN_Attention_Pooler_Layer(self.hidden_size)
         self.classifier = Linear_Layer(self.hidden_size, label_size, dropout, activation=None)
@@ -296,8 +298,14 @@ class BertTextClassificationDataset(BertTextDataset):
                  bert_pretrained_model: str = BERT_PRETRAINED_MODEL, max_seq_length: int = MAX_SENTIMENT_SEQ_LENGTH):
         super().__init__(data_path, treatment, subset, text_column, label_column, bert_pretrained_model, max_seq_length)
 
+    #read input example
     def read_examples_func(self, row):
-        return InputExample(unique_id=int(row.iloc[0]), text=str(row[self.text_column]), label=int(row[self.label_column]))
+        #todo: change
+        if self.label_column == f'{str.lower(TASK)}_label':
+            return InputExample(unique_id=int(row.iloc[0]), text=str(row[self.text_column]), label=row[self.label_column])
+        else:
+            return InputExample(unique_id=int(row.iloc[0]), text=str(row[self.text_column]),
+                                label=int(row[self.label_column]))
 
     def convert_examples_to_features(self, examples):
         """Loads a data file into a list of `InputFeature`s."""

@@ -24,6 +24,7 @@ FP16 = False
 def main():
     parser = ArgumentParser()
     parser.add_argument("--domain", type=str, default="topic_price_positive", choices=REVIEWS_FEATURES),
+    # what does this mean?
     parser.add_argument("--group", type=str, required=False, default="F",
                         help="Specify data group for experiments: F (factual) or CF (counterfactual)")
     parser.add_argument("--pretrained_epoch", type=int, required=False, default=0,
@@ -57,7 +58,7 @@ def bert_train_eval(hparams, output_dir):
 
 
 def train_models_unit(hparams: Dict, task, group, pretrained_control):
-    label_size = 2
+    label_size = hparams['bert_params']['label_size']
     if task == TASK:
         label_column = f"{task.lower()}_label"
     elif task == "ITT":
@@ -82,7 +83,7 @@ def train_models_unit(hparams: Dict, task, group, pretrained_control):
 
 def train_models(hparams: Dict, group: str, pretrained_epoch: int, pretrained_control: bool):
     print(f"Training {hparams['treatment']} {hparams['domain']} models")
-    sentiment_model = train_models_unit(hparams, "Sentiment", group, pretrained_control)
+    sentiment_model = train_models_unit(hparams, TASK, group, pretrained_control)
     itt_model = train_models_unit(hparams, "ITT", group, pretrained_control)
     itc_model = train_models_unit(hparams, "ICT", group, pretrained_control)
     if hparams["bert_params"]["bert_state_dict"]:
@@ -96,10 +97,12 @@ def train_models(hparams: Dict, group: str, pretrained_epoch: int, pretrained_co
 
 
 def train_all_models(args, domain: str):
+    # why is this in json file?
     with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
         review_features_treat_dict = json.load(jsonfile)
 
     treatment_topic = review_features_treat_dict[domain]["treated_feature"]
+    # does this mean than in practice it is possible to have only one control feature?
     control_topic = review_features_treat_dict[domain]["control_features"][-1]
 
     if args.pretrained_control:
@@ -109,7 +112,8 @@ def train_all_models(args, domain: str):
     if args.pretrained_epoch is not None:
         pretrained_treated_model_dir = f"{pretrained_treated_model_dir}/epoch_{args.pretrained_epoch}"
 
-    treatment = "topics"
+    #
+    treatment = "persuasion"
 
     hparams = {
         "treatment": treatment,
@@ -126,7 +130,7 @@ def train_all_models(args, domain: str):
             "batch_size": args.batch_size,
             "dropout": DROPOUT,
             "bert_state_dict": None,
-            "label_size": 2,
+            "label_size": 1,
             "name": f"Sentiment_{args.group}"
         }
     }
@@ -139,3 +143,6 @@ def train_all_models(args, domain: str):
 
 if __name__ == "__main__":
     main()
+
+
+# todo: questions: 1) the review starts with the word "positive"\"negative"
