@@ -37,8 +37,9 @@ def bert_treatment_test(model_ckpt, hparams, trainer, logger=None):
         model.bert_classifier.bert_state_dict = hparams["bert_params"]["bert_state_dict"]
         logger.info(f"Loading pretrained BERT model for {hparams['bert_params']['name']} from: "
                     f"{model.bert_classifier.bert_state_dict}")
-        model.bert_classifier.bert = BertPretrainedClassifier.load_frozen_bert(model.bert_classifier.bert_pretrained_model,
-                                                                               model.bert_classifier.bert_state_dict)
+        model.bert_classifier.bert =\
+            BertPretrainedClassifier.load_frozen_bert(model.bert_classifier.bert_pretrained_model,
+                                                      model.bert_classifier.bert_state_dict)
 
     # Update model hyperparameters
     model.hparams.output_path = hparams["output_path"]
@@ -60,7 +61,7 @@ def predict_models_unit(task, treatment, domain, trained_group, group, model_ckp
     if pretrained_epoch is not None:
         state_dict_dir = f"{state_dict_dir}/epoch_{pretrained_epoch}"
 
-    label_size = 2
+    label_size = hparams['label_size']
     if task == TASK:
         label_column = f"{task.lower()}_label"
     elif "ITT" in task:
@@ -80,7 +81,8 @@ def predict_models_unit(task, treatment, domain, trained_group, group, model_ckp
 
     if not model_ckpt:
         model_name = f"{task}_{hparams['trained_group']}"
-        models_dir = f"{REVIEWS_FEATURES_EXPERIMENTS_DIR}/{hparams['treatment']}/{hparams['domain']}/{model_name}/lightning_logs/*"
+        models_dir = f"{REVIEWS_FEATURES_EXPERIMENTS_DIR}/{hparams['treatment']}/{hparams['domain']}/{model_name}/" \
+                     f"lightning_logs/*"
         model_ckpt = find_latest_model_checkpoint(models_dir)
 
     # Group Task BERT Model training
@@ -124,7 +126,8 @@ def predict_models(treatment="topics", feature="books", trained_group="F", pretr
         "text_column": "review",
         "data_path": REVIEWS_FEATURES_DATASETS_DIR,
         "bert_params": {
-            "bert_state_dict": bert_state_dict
+            "bert_state_dict": bert_state_dict,
+            "label_size": 1,
         }
     }
     OUTPUT_DIR = f"{REVIEWS_FEATURES_EXPERIMENTS_DIR}/{treatment}/{feature}/COMPARE"

@@ -151,6 +151,7 @@ class BertForTopicTreatPreTraining(BertPreTrainedModel):
 
         return outputs  # (loss), prediction_scores, seq_relationship_score, (hidden_states), (attentions)
 
+
 class BertTopicTreatControlPreTrainingHeads(nn.Module):
     def __init__(self, config):
         super().__init__()
