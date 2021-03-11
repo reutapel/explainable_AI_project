@@ -1,6 +1,7 @@
 from typing import Union, Tuple
 from collections import defaultdict, Counter
 import numpy as np
+import pandas as pd
 
 
 def get_ATE(original_clf_f_probs: np.ndarray, original_clf_cf_probs: np.ndarray, confidence_intervals: bool = False) -> Union[float, Tuple[float, Tuple[float, float]]]:
@@ -110,7 +111,10 @@ def get_confidence_intervals(results_array: np.ndarray, final_result: float) -> 
 
 
 def main():
-    get_TReATE()
+    # original_clf_prob = pd.re
+    # treated_clf_probs =
+    # get_TReATE(original_clf_prob, treated_clf_probs, confidence_intervals=True)
+    check = 1
 
 
 if __name__ == '__main__':
