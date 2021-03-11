@@ -305,8 +305,8 @@ def execute_fold_parallel(participants_fold: pd.Series, fold: int, cuda_device: 
         print(f'\n computing SHAP values of {model_type}')
         pkl_model_path = Path(best_models_paths_dict[model_type])
         model = joblib.load(pkl_model_path)
-        X_test = test_x[['text_features']]
-        X_train = train_x[['text_features']]
+        X_test = test_x
+        X_train = train_x
 
         # create a file for the SHAP results to be saved at
         save_shap_values_path = pkl_model_path.parent.joinpath('SAHP_values_results')
