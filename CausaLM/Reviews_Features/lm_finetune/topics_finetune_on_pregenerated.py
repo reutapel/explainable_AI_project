@@ -318,7 +318,9 @@ def pretrain_on_domain(args):
         df.to_csv(args.output_dir/"losses.csv")
 
 
-def main():
+def main(REPLACE_REVIEWS_FEATURES=''):
+    if REPLACE_REVIEWS_FEATURES != '':
+        REVIEWS_FEATURES = REPLACE_REVIEWS_FEATURES
     parser = ArgumentParser()
     parser.add_argument('--pregenerated_data', type=Path, required=False)
     parser.add_argument("--output_dir", type=Path, required=False)
@@ -369,7 +371,7 @@ def main():
                         type=int,
                         default=RANDOM_SEED,
                         help="random seed for initialization")
-    parser.add_argument("--domain", type=str, default="topic_price_positive", choices=REVIEWS_FEATURES)
+    parser.add_argument("--domain", type=str, default=REVIEWS_FEATURES, choices=REVIEWS_FEATURES)
     parser.add_argument("--control", action="store_true",
                         help="Use pretraining model with control task")
     args = parser.parse_args()

@@ -37,8 +37,8 @@ class XAIMethods:
 
             elif str.lower(self.model_type) in ['randomforest', 'xgboost', 'catboost']:
                 # (same syntax works for LightGBM, CatBoost, scikit-learn and spark models)
-                if str.lower(self.model_type) == 'catboost':
-                    X_test.columns = [' '.join(col).strip() for col in X_test.columns.values]
+                # if str.lower(self.model_type) == 'catboost':
+                #     X_test.columns = [' '.join(col).strip() for col in X_test.columns.values]
                 self.explainer = shap.TreeExplainer(model)
                 self.shap_values = self.explainer.shap_values(X_test)
 
