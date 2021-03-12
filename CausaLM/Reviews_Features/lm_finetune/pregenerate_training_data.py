@@ -22,6 +22,8 @@ MLM_PROB = 0.15
 MAX_PRED_PER_SEQ = 30
 
 
+
+
 class DocumentDatabase:
     def __init__(self, reduce_memory=False):
         if reduce_memory:
@@ -279,7 +281,9 @@ def create_training_file(docs, vocab_list, args, epoch_num, output_dir):
         metrics_file.write(json.dumps(metrics))
 
 
-def main():
+def main(REPLACE_REVIEWS_FEATURES=''):
+    if REPLACE_REVIEWS_FEATURES != '':
+        REVIEWS_FEATURES = REPLACE_REVIEWS_FEATURES
     parser = ArgumentParser()
     parser.add_argument('--train_corpus', type=Path, required=False)
     parser.add_argument("--output_dir", type=Path, required=False)
@@ -303,7 +307,7 @@ def main():
                         help="Probability of masking each token for the LM task")
     parser.add_argument("--max_predictions_per_seq", type=int, default=MAX_PRED_PER_SEQ,
                         help="Maximum number of tokens to mask in each sequence")
-    parser.add_argument("--treated", type=str, default="topic_price_positive", choices=REVIEWS_FEATURES)
+    parser.add_argument("--treated", type=str, default=REVIEWS_FEATURES, choices=REVIEWS_FEATURES)
     args = parser.parse_args()
 
     if args.num_workers > 1 and args.reduce_memory:
