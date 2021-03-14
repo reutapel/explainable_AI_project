@@ -1,11 +1,12 @@
 import torch
-from pytorch_transformers import *
+from transformers import *
 import pandas as pd
 import datetime
 import numpy as np
 import math
 import os
 import joblib
+from os.path import dirname, abspath
 
 
 def average_vectors(vectors_list):
@@ -169,7 +170,7 @@ class BertTransformer:
         input_ids = self.tokenizer.convert_tokens_to_ids(tokenized)
         input_ids_list = list()
         input_ids_list.append(input_ids)
-        print(f'input_ids length is {len(input_ids)}')
+        # print(f'input_ids length is {len(input_ids)}')
 
         if len(input_ids) > max_size:
             if split_id in input_ids:
@@ -197,21 +198,25 @@ class BertTransformer:
 def main():
     base_directory = os.path.abspath(os.curdir)
     data_directory = os.path.join(base_directory, 'verbal')
-    for data_type in ['train', 'test']:
-        reviews = pd.read_excel(os.path.join(data_directory, f'hand_crafted_features_{data_type}_data.xlsx'),
-                                usecols=['review_id', 'review'])
-        # reviews = pd.read_csv('labeledTrainData.csv')
-        models_path = os.path.join(base_directory, 'bert_models')
-        bert_models = ['topic_price_positive']
-        for model in bert_models:
-            bert_state_dict_path = os.path.join(models_path, model, 'model', 'pytorch_model.bin')
-            bert_model = BertTransformer(bert_state_dict_path=bert_state_dict_path)
+    path = f'{dirname(dirname(abspath(__file__)))}/CausaLM/Reviews_Features/datasets/causal_graph.csv'
+    causal_graph_df = pd.read_csv(path)
+    bert_models = causal_graph_df.col_name.unique()
+    for model in bert_models:
+        bert_state_dict_path = os.path.join(f'{dirname(dirname(abspath(__file__)))}/CausaLM/Models/Pretrain/IXT',
+                                            model, 'model', 'pytorch_model.bin')
+        bert_model = BertTransformer(bert_state_dict_path=bert_state_dict_path)
+        for data_type in ['train', 'test']:
+            reviews = pd.read_excel(os.path.join(data_directory, f'hand_crafted_features_{data_type}_data.xlsx'),
+                                    usecols=['review_id', 'review'])
+            print(f'Start create reviews representation for treatment {model} and {data_type} data')
+            # reviews = pd.read_csv('labeledTrainData.csv')
+            # models_path = os.path.join(base_directory, 'bert_models')
             reviews = reviews.assign(review_features='')
             for index, row in reviews.iterrows():
                 # print(f'Start create BERT embedding to review ID: {row.review_id}, num of chars: {len(row.review)}, '
                 #       f'review: {row.review}')
                 reviews.at[index, 'review_features'] = bert_model.get_text_average_pooler_split_bert(row.review,
-                                                                                                     max_size=450)
+                                                                                                 max_size=450)
 
             # reviews.to_excel(os.path.join(data_directory, 'bert_embedding_test_data.xlsx'))
             joblib.dump(reviews, (os.path.join(data_directory,

@@ -1,10 +1,12 @@
 import pandas as pd
 import json
-from CausaLM.Reviews_Features.lm_finetune import pregenerate_training_data, topics_finetune_on_pregenerated
-from CausaLM.constants import REVIEWS_FEATURES, REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, REVIEWS_FEATURES_DATASETS_DIR
+import os
+from Reviews_Features.lm_finetune import pregenerate_training_data, topics_finetune_on_pregenerated
+from constants import REVIEWS_FEATURES, REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, REVIEWS_FEATURES_DATASETS_DIR
 
 CAUSAL_GRAPH_TRETEMENT_COL = 'col_name'
 CAUSAL_GRAPH_CONTROL_COL = 'control'
+
 
 def create_json_map(treated_feature, control_features):
     # with open(REVIEWS_FEATURES_TREAT_CONTROL_MAP_FILE, "r") as jsonfile:
@@ -21,6 +23,7 @@ def create_json_map(treated_feature, control_features):
 
 
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     path = f"{REVIEWS_FEATURES_DATASETS_DIR}/causal_graph.csv"
     causal_graph_df = pd.read_csv(path)
     for index, row in causal_graph_df.iterrows():

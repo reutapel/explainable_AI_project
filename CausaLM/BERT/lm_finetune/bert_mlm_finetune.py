@@ -1,4 +1,4 @@
-from CausaLM.BERT.bert_text_dataset import BertTextDataset
+from BERT.bert_text_dataset import BertTextDataset
 from transformers.modeling_bert import BertLMPredictionHead, BertPreTrainedModel, BertModel
 from torch.nn import CrossEntropyLoss
 import torch.nn as nn

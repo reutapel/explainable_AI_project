@@ -6,6 +6,7 @@ import json
 import random
 import numpy as np
 import pandas as pd
+import os
 from collections import namedtuple, defaultdict
 from tempfile import TemporaryDirectory
 
@@ -15,13 +16,13 @@ from tqdm import tqdm
 
 from transformers.tokenization_bert import BertTokenizer
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
-from CausaLM.Reviews_Features.lm_finetune.pregenerate_training_data import EPOCHS
-from CausaLM.Reviews_Features.lm_finetune.bert_topics_finetune import BertForTopicTreatControlPreTraining, \
+from Reviews_Features.lm_finetune.pregenerate_training_data import EPOCHS
+from Reviews_Features.lm_finetune.bert_topics_finetune import BertForTopicTreatControlPreTraining, \
     BertForTopicTreatPreTraining
-from CausaLM.BERT.bert_text_dataset import BertTextDataset
-from CausaLM.utils import init_logger
+from BERT.bert_text_dataset import BertTextDataset
+from utils import init_logger
 
-from CausaLM.constants import RANDOM_SEED, REVIEWS_FEATURES_PRETRAIN_DIR, BERT_PRETRAINED_MODEL, NUM_CPU, \
+from constants import RANDOM_SEED, REVIEWS_FEATURES_PRETRAIN_DIR, BERT_PRETRAINED_MODEL, NUM_CPU, \
     REVIEWS_FEATURES_PRETRAIN_DATA_DIR, REVIEWS_FEATURES_PRETRAIN_IXT_DIR, REVIEWS_FEATURES
 
 BATCH_SIZE = 6
@@ -151,17 +152,21 @@ def pretrain_on_domain(args):
     else:
         num_data_epochs = args.epochs
 
-    if args.local_rank == -1 or args.no_cuda:
-        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-        n_gpu = torch.cuda.device_count()
-    else:
-        torch.cuda.set_device(args.local_rank)
-        device = torch.device("cuda", args.local_rank)
-        n_gpu = 1
-        # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.distributed.init_process_group(backend='nccl')
-    logging.info("device: {} n_gpu: {}, distributed training: {}, 16-bits training: {}".format(
-        device, n_gpu, bool(args.local_rank != -1), args.fp16))
+    # if args.local_rank == -1 or args.no_cuda:
+    #     device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+    #     n_gpu = torch.cuda.device_count()
+    # else:
+    #     torch.cuda.set_device(args.local_rank)
+    #     device = torch.device("cuda", args.local_rank)
+    #     n_gpu = 1
+    #     # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+    #     torch.distributed.init_process_group(backend='nccl')
+    # logging.info("device: {} n_gpu: {}, distributed training: {}, 16-bits training: {}".format(
+    #     device, n_gpu, bool(args.local_rank != -1), args.fp16))
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    device = torch.device("cuda:1")
+    n_gpu = 1
 
     if args.gradient_accumulation_steps < 1:
         raise ValueError("Invalid gradient_accumulation_steps parameter: {}, should be >= 1".format(

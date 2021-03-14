@@ -10,6 +10,7 @@ import copy
 import time
 import itertools
 from collections import defaultdict
+from os.path import dirname, abspath
 
 
 base_directory = os.path.abspath(os.curdir)
@@ -761,7 +762,7 @@ def main(features_to_use: list=None):
         'bert_embedding': 'pkl',
     }
 
-    features_files[f'bert_embedding_for_feature_{features_to_use[0]}'] = 'pkl'
+    features_files[features_to_use[0]] = 'pkl'
 
     # features_to_use can be: one of the keys in features_files, or any combination of them
     if features_to_use is None:
@@ -776,7 +777,7 @@ def main(features_to_use: list=None):
                    'suffix_average_text': False,  # use the suffix trials average textual features
                    'no_suffix_text': False,  # don't use the suffix text
                    'no_decision_features': False,  # if we want to check models without decision features
-                   'non_nn_turn_model': True,  # non neural networks models that predict a label for each round
+                   'non_nn_turn_model': False,  # non neural networks models that predict a label for each round
                    'transformer_model': False,   # for transformer models
                    'prefix_data_in_sequence': True,  # if the prefix data is not in the suffix features but in the seq
                    'suffix_no_current_round_average_text': False,  # use the average text of all suffix trials in SVM-CR
@@ -784,7 +785,7 @@ def main(features_to_use: list=None):
                    }
     }
     use_prefix_suffix_setting = True  # relevant to all sequential models in the prefix_suffix setting
-    string_labels = False  # labels are string --> for LSTM and transformer model
+    string_labels = True  # labels are string --> for LSTM and transformer model
     data_type_list = ['train_data', 'test_data']  # it can be train_data or test_data
     total_payoff_label = False if conditions_dict[condition]['label'] == 'single_round' else True
     features_to_drop = []  # if we don't want to use some of the features
@@ -825,6 +826,8 @@ def main(features_to_use: list=None):
 
 
 if __name__ == '__main__':
-    bert_models = ['topic_price_positive']
+    path = f'{dirname(dirname(abspath(__file__)))}/CausaLM/Reviews_Features/datasets/causal_graph.csv'
+    causal_graph_df = pd.read_csv(path)
+    bert_models = causal_graph_df.col_name.unique()
     for model in bert_models:
         main(features_to_use=[f'bert_embedding_for_feature_{model}'])
