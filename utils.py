@@ -590,3 +590,57 @@ def calculate_continues_predictive_model_measures(all_predictions: pd.DataFrame,
         results_dict[f'{measure_name}'] = round(measure * 100, 2)
 
     return results_dict
+
+
+def flat_seq_predictions_list_column(prediction: pd.DataFrame, label_column_name_per_round: str,
+                                     prediction_column_name_per_round: str) -> pd.DataFrame:
+    """
+    Use the prediction DF to get one column of all rounds predictions and labels, in order to calculate
+    the per round measures
+    :param prediction: pd.Dataframe with the the prediction
+    :param label_column_name_per_round: the name od the label column per round (for example: y_0, y_1, ..., y_9)
+    :param prediction_column_name_per_round: the name od the prediction column per round
+    (for example: y_prime_0, y_prime_1, ..., y_prime_9)
+    :return: pd.Dataframe with 2 columns: labels and predictions with the labels and predictions per round for
+    the saifa data
+    """
+
+    flat_data_dict = dict()
+    for list_column, new_column in [[label_column_name_per_round, per_round_labels_name],
+                                    [prediction_column_name_per_round, per_round_predictions_name]]:
+        # create a pd with [new_column, 'raisha', 'sample_id'] columns
+        flat_data = copy.deepcopy(prediction)
+        # reset index to get numeric index for the future merge
+        flat_data['sample_id'] = flat_data.index
+        flat_data.reset_index(inplace=True, drop=True)
+        flat_data = flat_data[[list_column, 'raisha', 'sample_id']]
+        lens_of_lists = flat_data[list_column].apply(len)
+        origin_rows = range(flat_data.shape[0])
+        destination_rows = np.repeat(origin_rows, lens_of_lists)
+        non_list_cols = [idx for idx, col in enumerate(flat_data.columns) if col != list_column]
+        expanded_df = flat_data.iloc[destination_rows, non_list_cols].copy()
+        expanded_df[new_column] = [i for items in flat_data[list_column] for i in items]
+        # remove non 0/1 rows and reset index
+        if expanded_df[new_column].dtype == int:
+            expanded_df = expanded_df.loc[expanded_df[new_column].isin([0, 1])]
+        elif expanded_df[new_column].dtype == str:
+            expanded_df = expanded_df.loc[expanded_df[new_column].isin(['0', '1'])]
+        else:
+            print(f'expanded_df[new_column] type must be int or str')
+            raise ValueError(f'expanded_df[new_column] type must be int or str')
+        # create round number column
+        round_number = pd.Series()
+        for index, round_num in lens_of_lists.iteritems():
+            round_number =\
+                round_number.append(pd.Series(list(range(11-round_num, 11)), index=np.repeat(index, round_num)))
+        expanded_df['round_number'] = round_number
+        expanded_df.reset_index(inplace=True, drop=True)
+        flat_data_dict[new_column] = expanded_df[[new_column]]
+        flat_data_dict['metadata'] = expanded_df[['raisha', 'sample_id', 'round_number']]
+
+    # concat the new labels and new predictions per round
+    flat_data = flat_data_dict[per_round_labels_name].join(flat_data_dict[per_round_predictions_name]).\
+        join(flat_data_dict['metadata'])
+    flat_data.reset_index(inplace=True, drop=True)
+
+    return flat_data
